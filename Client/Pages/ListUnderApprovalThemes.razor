@@ -1,0 +1,57 @@
+﻿@inherits CommonComponentBase
+@page "/themesunderapproval"
+@attribute [Authorize(Roles = Roles.ProgrammeLeader)]
+@inject IThemeService ThemeService
+@using Syncfusion.Blazor.Grids;
+
+<PageTitle>Jóváhagyandó Témák</PageTitle>
+<LoadingScreen IsLoading="@isLoading">
+    <style>
+        .PannonColoredBtn {
+            background-color: rgb(90,60,90) !important;
+            border: none !important;
+        }
+    </style>
+    <div class="container">
+        <h2>Jóváhagyandó Témák</h2>
+
+        <SfGrid DataSource="@ThemeService.ThemeProgrammes" AllowSorting="true" AllowPaging="true" AllowFiltering="true"
+            AllowTextWrap="true">
+            <GridEvents CommandClicked="OnCommandClicked" TValue="ThemeProgrammeDto"></GridEvents>
+            <GridColumns>
+                <GridColumn Field=@nameof(ThemeProgrammeDto.ThemeTitle) HeaderText="Cím" Width="40%"></GridColumn>
+                <GridColumn Field=@nameof(ThemeProgrammeDto.InstructorName) HeaderText="Oktató"></GridColumn>
+                <GridColumn Field=@nameof(ThemeProgrammeDto.ThemeType) HeaderText="Típus"></GridColumn>
+                <GridColumn Field=@nameof(ThemeProgrammeDto.ProgrammeName) HeaderText="Szak"></GridColumn>
+                <GridColumn Field=@nameof(ThemeProgrammeDto.CreatedAt) HeaderText="Létrehozva"></GridColumn>
+                <GridColumn HeaderText="Kezelés" TextAlign="TextAlign.Left" Width="10%">
+                    <GridCommandColumns>
+                        <GridCommandColumn ButtonOption="@(new CommandButtonOptions() { Content = "Megtekintés",CssClass="PannonColoredBtn" })"></GridCommandColumn>
+                    </GridCommandColumns>
+                </GridColumn>
+            </GridColumns>
+        </SfGrid>
+    </div>
+</LoadingScreen>
+
+@code {
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ThemeService.GetThemeProgrammes();
+        if (ThemeService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Warning, ThemeService.ErrorMessage ?? Messages.LoadFailed, ToastType.Warning);
+        }
+        isLoading = false;
+    }
+
+    public void OnCommandClicked(CommandClickEventArgs<ThemeProgrammeDto> args)
+    {
+        if (args.CommandColumn.ButtonOption.Content.Equals("Megtekintés"))
+        {
+            NavigateTo($"/theme/{args.RowData.ThemeId}/{args.RowData.ProgrammeId}?returnUrl=themesunderapproval");
+        }
+    }
+}

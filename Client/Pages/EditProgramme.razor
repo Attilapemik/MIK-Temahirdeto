@@ -1,0 +1,88 @@
+﻿@inherits CommonComponentBase
+@page "/editprogramme/{id}"
+@using Syncfusion.Blazor.Inputs
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject IProgrammeService ProgrammeService
+
+<PageTitle>Szak szerkesztése</PageTitle>
+
+<LoadingScreen IsLoading="@isLoading">
+    <HeadContent>
+        <style>
+            .form-check .form-check-input {
+                float: left;
+                background-color: #0d6efd;
+                border-color: #0d6efd;
+            }
+
+            .form-switch .form-check-input {
+                background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+            }
+        </style>
+    </HeadContent>
+    <div class="container">
+        <h2>Szak szerkesztése</h2>
+        <EditForm Model="@programme" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <div>
+                <label for="programmename">Név: </label>
+                <InputText id="programmename" @bind-Value="programme.Name" class="form-control focusable" />
+                <ValidationMessage For="@(() => programme.Name)" />
+                <label for="programmecolor">Szín: </label>
+                <br />
+                <SfColorPicker id="programmecolor" ValueChange="Valtozas" @bind-Value="programme.Color" ModeSwitcher="false"
+                               CssClass="focusable" />
+                <ValidationMessage For="@(() => programme.Color)" />
+                <br />
+                <label for="programmetype">Képzés szintje: </label>
+                <div class="d-flex">
+                    <label class="form-check-label">BSc</label>
+                    <div class="form-switch form-check ms-2">
+                        <InputCheckbox id="programmetype" @bind-Value="@isMSc" class="form-check-input form-control" />
+                    </div>
+                    <label class="form-check-label">MSc</label>
+                </div>
+            </div>
+            <br />
+            <CommonButtons GoBackUri="/programmes"></CommonButtons>
+        </EditForm>
+    </div>
+</LoadingScreen>
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+
+    private bool isMSc = false;
+    ProgrammeDto programme = new ProgrammeDto();
+    public bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ProgrammeService.GetProgramme(id);
+
+        programme.Id = ProgrammeService.Programme.Id;
+        programme.Name = ProgrammeService.Programme.Name;
+        programme.Color = ProgrammeService.Programme.Color;
+        isMSc = ProgrammeService.Programme.ProgrammeType == ProgrammeType.MSc;
+        isLoading = false;
+    }
+
+    async void HandleSubmit()
+    {
+        programme.ProgrammeType = isMSc ? ProgrammeType.MSc : ProgrammeType.BSc;
+        await ProgrammeService.EditProgramme(programme);
+        if (ProgrammeService.ErrorMessage is null)
+        {
+            ShowToast(Messages.SuccessEdit, $"A(z) '{programme.Name}' nevű szak sikeresen módosítva", ToastType.Success);
+            NavigateBack();
+            return;
+        }
+        ShowToast(Messages.Error, ProgrammeService.ErrorMessage, ToastType.Danger);
+    }
+
+    public void Valtozas(ColorPickerEventArgs e)
+    {
+        programme.Color = e.CurrentValue.Hex;
+    }
+}

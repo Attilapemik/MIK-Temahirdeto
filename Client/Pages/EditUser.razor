@@ -1,0 +1,170 @@
+﻿@inherits CommonComponentBase
+@page "/edituser/{id}"
+@using PannonBlazor.Client.Services.RoleService
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject IInstructorService InstructorService
+@inject IProgrammeService ProgrammeService
+@inject IDepartmentService DepartmentService
+@inject IRoleService RoleService
+@inject IAuthService AuthService
+
+<PageTitle>Felhasználó szerkesztése</PageTitle>
+
+<LoadingScreen IsLoading="@isLoading">
+    <div class="container">
+        <h2>Felhasználó szerkesztése</h2>
+        <EditForm Model="@user" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <div>
+                <label for="username">Felhasználónév: </label>
+                <InputText id="username" @bind-Value="user.Username" class="form-control focusable" />
+                <ValidationMessage For="@(() => user.Username)" />
+            </div>
+            <div>
+                <label for="email">Email: </label>
+                <InputText id="email" @bind-Value="user.Email" class="form-control" />
+                <ValidationMessage For="@(() => user.Email)" />
+            </div>
+            <div>
+                <label for="neptuncode">Neptunkód: </label>
+                <InputText id="neptuncode" @bind-Value="user.NeptunCode" class="form-control" />
+                <ValidationMessage For="@(() => user.NeptunCode)" />
+            </div>
+            <div class="form-outline mb-4">
+                <label class="form-label" for="uid">Ldap UID</label>
+                <InputText id="uid" @bind-Value="user.LdapUid" class="form-control form-control-lg" disabled="true" />
+                @if (string.IsNullOrEmpty(user.LdapUid))
+                {
+                    <p class="text-center text-muted">
+                        <a @onclick='GetUserLdapUid' style="cursor: pointer;" class="fw-bold text-body">
+                            <u>LDAP UID lekérése</u>
+                        </a>
+                    </p>
+                }
+            </div>
+            <div>
+                <label for="role">Szerepkör: </label>
+                <CheckBoxList Data="@RoleService.Roles"
+                              TextField="@((item)=>item.DisplayName)"
+                              ValueField="@((item)=>item.Id)"
+                              SelectedValues="@SelectedRoleIds"
+                              OnSelectionChanged="@HandleSelectionChanged" />
+            </div>
+            <div>
+                <label for="department">Tanszék: </label>
+                <InputSelect id="department" @bind-Value="user.DepartmentId" class="form-control">
+                    @foreach (var department in DepartmentService.Departments)
+                    {
+                        <option value="@department.Id">@department.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            @if (VisibleProgramme)
+            {
+                <div>
+                    <label for="programme">Szak: </label>
+                    <InputSelect id="programme" @bind-Value="user.ProgrammeId" class="form-control">
+                        <option value=""></option>
+                        @foreach (var programme in ProgrammeService.Programmes)
+                        {
+                            <option value="@programme.Id">@programme.Name</option>
+                        }
+                    </InputSelect>
+                </div>
+            }
+            <br />
+            <CommonButtons GoBackUri="/instructors"></CommonButtons>
+        </EditForm>
+    </div>
+</LoadingScreen>
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+
+    public bool isLoading = true;
+    public bool VisibleProgramme = false;
+    UserDto user = new UserDto();
+
+    protected List<string> SelectedRoleIds = new List<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await InstructorService.GetInstructor(id);
+        if (InstructorService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, InstructorService.ErrorMessage, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        await ProgrammeService.GetProgrammes();
+        if (ProgrammeService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, ProgrammeService.ErrorMessage, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        await DepartmentService.GetDepartments();
+        if (DepartmentService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, DepartmentService.ErrorMessage, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        await RoleService.GetRoles();
+        if (RoleService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, RoleService.ErrorMessage, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+
+        user.Id = InstructorService.User.Id;
+        user.Username = InstructorService.User.Username;
+        user.Email = InstructorService.User.Email;
+        user.NeptunCode = InstructorService.User.NeptunCode;
+        user.DepartmentId = InstructorService.User.DepartmentId ?? DepartmentService.Departments.FirstOrDefault()?.Id ?? null;
+        user.ProgrammeId = InstructorService.User.ProgrammeId ?? null;
+        user.RoleIds = InstructorService.User.Roles.Select(r => r.Id.ToString()).ToList() ?? new List<string>();
+        user.LdapUid = InstructorService.User.LdapUid;
+        SelectedRoleIds = user.RoleIds.ToList();
+
+        VisibleProgramme = SelectedRoleIds.Any(sri => sri.Equals("2"));
+        isLoading = false;
+    }
+
+    async void HandleSubmit()
+    {
+        user.RoleIds = SelectedRoleIds;
+        if (!user.RoleIds.Any(ri => ri.Equals("2")))
+        {
+            user.ProgrammeId = null;
+        }
+        await InstructorService.EditUser(user);
+        if (InstructorService.ErrorMessage is null)
+        {
+            ShowToast(Messages.SuccessEdit, $"A(z) '{user.Username}' nevű felhasználó sikeresen módosítva", ToastType.Success);
+            NavigateBack();
+            return;
+        }
+        ShowToast(Messages.Error, InstructorService.ErrorMessage, ToastType.Danger);
+    }
+
+    void HandleSelectionChanged(List<string> selectedValues)
+    {
+        VisibleProgramme = selectedValues.Any(sri => sri.Equals("2"));
+        StateHasChanged();
+    }
+
+    async Task GetUserLdapUid()
+    {
+        if (!string.IsNullOrEmpty(user.Email))
+        {
+            var result = await AuthService.GetUserLdapUid(user.Email);
+            if (result != null && result.Success)
+            {
+                user.LdapUid = result.Data ?? "";
+            }
+        }
+    }
+}

@@ -1,0 +1,56 @@
+﻿@inherits CommonComponentBase
+@page "/createsemester"
+@using Syncfusion.Blazor.Calendars
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject ISemesterService<SemesterDto> SemesterService
+
+<PageTitle>Időszak létrehozása</PageTitle>
+
+<div class="container">
+    <h2>Időszak létrehozása</h2>
+    <EditForm Model="semester" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        <div>
+            <label for="semester">Név: </label>
+            <InputText id="semester" @bind-Value="semester.Name" class="form-control focusable" />
+            <ValidationMessage For="@(() => semester.Name)" />
+            <label for="semesterdates">Időszak: </label>
+            <SfDateRangePicker id="semesterdates" class="form-control" autofocus StartDate="semester.StartDate" EndDate="semester.EndDate">
+                <DateRangePickerEvents TValue="DateTime" ValueChange="@onChange"></DateRangePickerEvents>
+            </SfDateRangePicker>
+        </div>
+        <br />
+        <CommonButtons GoBackUri="/semesters"></CommonButtons>
+    </EditForm>
+</div>
+
+@code {
+
+    SemesterDto semester = new SemesterDto();
+    protected override void OnInitialized()
+    {
+        semester.StartDate = DateTime.Now;
+        semester.EndDate = DateTime.Now.AddDays(100);
+    }
+
+    async Task HandleSubmit()
+    {
+        await SemesterService.CreateSemester(semester);
+        if (SemesterService.ErrorMessage is null)
+        {
+            ShowToast(Messages.SuccessCreate, "Félév Hozzáadva", ToastType.Success);
+            NavigateBack();
+        }
+        else
+        {
+            ShowToast(Messages.FailedCreate, SemesterService.ErrorMessage ?? "Félév hozzáadása sikertelen", ToastType.Warning);
+        }
+    }
+
+    private void onChange(RangePickerEventArgs<DateTime> args)
+    {
+        semester.StartDate = args.StartDate;
+        semester.EndDate = args.EndDate;
+        StateHasChanged();
+    }
+}

@@ -1,0 +1,78 @@
+﻿@using System.Net
+@inject NavigationManager UriHelper
+@inherits ErrorBoundary
+@inject ILocalStorageService LocalStorage
+@inject AuthenticationStateProvider AuthStateProvider
+@using Syncfusion.Blazor.Cards
+@if (CurrentException is null || CurrentException is HttpRequestException {StatusCode: HttpStatusCode.Unauthorized })
+{
+    @ChildContent
+}
+else if (ErrorContent is not null)
+{
+    @ErrorContent(CurrentException)
+}
+else
+{
+    <div class="row">
+        <SfCard ID="NewIconCard">
+            <div class="newIcon">Hiba</div>
+            <CardHeader Title="Nem kezelt hiba történt, próbálja meg az oldalt újratölteni!" />
+            @foreach (var exception in receivedExceptions)
+            {
+                <CardContent Content="@exception.Message" />
+            }
+        </SfCard>
+    </div>
+    <style>
+        #NewIconCard {
+            height: 180px;
+            margin: 16px;
+        }
+        .newIcon {
+            background: red;
+            border-radius: 12px;
+            border-radius: 12px;
+            font-family: HelveticaNeue-Medium, 'Segoe UI';
+            font-weight: 500;
+            color: #ffffff;
+            margin-left: 16px;
+            font-size: 14px;
+            width: 58px;
+            height: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            letter-spacing: 0.4px;
+        }
+        .row {
+            width: 80%;
+            margin: auto;
+        }
+    </style>
+}
+
+@code {
+    List<Exception> receivedExceptions = new();
+
+    protected override async Task OnErrorAsync(Exception exception)
+    {
+        if (exception is HttpRequestException {StatusCode: HttpStatusCode.Unauthorized })
+        {
+            await LocalStorage.RemoveItemAsync("authToken");
+            await AuthStateProvider.GetAuthenticationStateAsync();
+            UriHelper.NavigateTo("login?code=401");
+        }
+        else
+        {
+            receivedExceptions.Add(exception);
+        }
+        await base.OnErrorAsync(exception);
+    }
+
+    public new void Recover()
+    {
+        receivedExceptions.Clear();
+        base.Recover();
+    }
+}

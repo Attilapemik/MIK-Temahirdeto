@@ -1,0 +1,89 @@
+﻿@inherits CommonComponentBase
+@page "/programmes"
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject IProgrammeService ProgrammeService
+@inject IJSRuntime JSRuntime
+<PageTitle>Szakok</PageTitle>
+
+<LoadingScreen IsLoading="@isLoading">
+    @if (ProgrammeService.Programmes.Count == 0 || ProgrammeService.ErrorMessage is not null)
+    {
+        <div class="container">
+            <div class="row">
+                <div class="col-6">
+                    <h2>Nem rögzítettek még Szakot</h2>
+                </div>
+                <div class="col-6">
+                    <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/createprogramme?returnUrl=programmes")'>Új szak</button>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="container">
+            <div class="row">
+                <div class="col-6">
+                    <h2 style="float: left;">Szakok</h2>
+                </div>
+                <div class="col-6">
+                    <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/createprogramme?returnUrl=programmes")'>Új szak</button>
+                </div>
+            </div>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th colspan="3">Név</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var programme in ProgrammeService.Programmes)
+                    {
+                        <tr>
+                            <td style="vertical-align: middle">
+                                <svg width="16" height="16" style="vertical-align: initial">
+                                    <rect width="100" height="100" style="fill:@programme.Color" />
+                                </svg>
+                                <span style="vertical-align: text-bottom">@programme.Name</span>
+                            </td>
+                            <td><button class="btn btn-primary" @onclick="(() => EditProgramme(programme.Id))">Szerkeszt</button></td>
+                            <td><button type="button" class="btn btn-danger" @onclick="(() => DeleteProgramme(programme.Id))">Törlés</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</LoadingScreen>
+@code {
+    public bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ProgrammeService.GetProgrammes();
+        if (ProgrammeService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, ProgrammeService.ErrorMessage, ToastType.Danger);
+        }
+        isLoading = false;
+    }
+
+    private void EditProgramme(int programmeId)
+    {
+        NavigateTo($"/editprogramme/{programmeId}?returnUrl=programmes");
+    }
+
+    private async void DeleteProgramme(int programmeId)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Biztosan törölni szeretnéd a szakot?"))
+            return;
+        await ProgrammeService.DeleteProgramme("" + programmeId);
+        if (ProgrammeService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.FailedDelete, ProgrammeService.ErrorMessage, ToastType.Warning);
+            return;
+        }
+        ShowToast(Messages.SuccessDelete, "Szak sikeresen törölve", ToastType.Success);
+        ReloadPage();
+    }
+}

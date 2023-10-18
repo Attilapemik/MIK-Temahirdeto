@@ -1,0 +1,85 @@
+﻿@inherits CommonComponentBase
+@page "/companies"
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject ICompanyService CompanyService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Cégek</PageTitle>
+<LoadingScreen IsLoading="isLoading">
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <h2 style="float: left;">Cégek</h2>
+            </div>
+            <div class="col">
+                <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/createcompany")'>Új Cég</button>
+            </div>
+        </div>
+        @if (CompanyService.Companies.Count == 0)
+        {
+            <div class="row">
+                <span>Nincsenek cégek rögzítve</span>
+            </div>
+        }
+        else
+        {
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th colspan="3">Név</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var company in CompanyService.Companies)
+                    {
+                        <tr>
+                            <td>@company.Name</td>
+                            <td>
+                                <button type="button" class="btn btn-danger" style="float: right; margin-left: 10px" @onclick="(() => DeleteCompany(company.Id))">Törlés</button>
+                                <button class="btn btn-primary" style="float: right;" @onclick="(() => EditCompany(company.Id))">Szerkeszt</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</LoadingScreen>
+
+@code {
+    private bool isLoading = true;
+    protected override async Task OnInitializedAsync()
+    {
+        await CompanyService.GetCompanies();
+        if (CompanyService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, CompanyService.ErrorMessage, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        isLoading = false;
+    }
+
+    private void EditCompany(int companyId)
+    {
+        NavigateTo($"/editcompany/{companyId}?returnUrl=companies");
+    }
+
+    private async void DeleteCompany(int companyId)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Biztosan törölni szeretnéd a céget?"))
+            return;
+
+        await CompanyService.DeleteCompany(companyId);
+
+        if (CompanyService.ErrorMessage is null)
+        {
+            ShowToast(Messages.SuccessDelete, $"A '{companyId}' azonosítójú cég törölve lett az adatbázisból", ToastType.Success);
+            ReloadPage();
+        }
+        else
+        {
+            ShowToast(Messages.FailedDelete, CompanyService.ErrorMessage ?? "Nem sikerült törölni a céget", ToastType.Danger);
+        }
+    }
+}

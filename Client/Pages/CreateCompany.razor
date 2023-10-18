@@ -1,0 +1,35 @@
+﻿@inherits CommonComponentBase
+@page "/createcompany"
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject ICompanyService CompanyService
+
+<PageTitle>Cég létrehozása</PageTitle>
+<div class="container">
+    <h2>Cég létrehozása</h2>
+    <EditForm Model="company" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        <div>
+            <label for="company">Név: </label>
+            <InputText id="company" @bind-Value="company.Name" class="form-control focusable" />
+            <ValidationMessage For="@(() => company.Name)" />
+        </div>
+        <br />
+        <CommonButtons GoBackUri="/companies"></CommonButtons>
+    </EditForm>
+</div>
+@code {
+    CompanyDto company = new CompanyDto();
+    async void HandleSubmit()
+    {
+        await CompanyService.CreateCompany(company);
+        if (CompanyService.ErrorMessage is null)
+        {
+            ShowToast(Messages.SuccessCreate, "Cég Hozzáadva", ToastType.Success);
+            NavigateBack();
+        }
+        else
+        {
+            ShowToast(Messages.FailedCreate, CompanyService.ErrorMessage ?? "Cég hozzáadása sikertelen", ToastType.Warning);
+        }
+    }
+}

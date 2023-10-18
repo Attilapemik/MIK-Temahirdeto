@@ -1,0 +1,41 @@
+﻿
+@using Microsoft.AspNetCore.WebUtilities
+@inject NavigationManager NavigationManager
+
+<div>
+    <button @onclick="NavigateBack" class="btn btn-secondary">Vissza</button>
+</div>
+
+@code {
+    [Parameter] public string Uri { get; set; } = "/";
+    private bool shouldStayOnPage = false;
+
+    private string filter = "";
+    private int currentPage = 1;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("filter", out var filterValue))
+        {
+            filter = filterValue;
+        }
+        if (query.TryGetValue("page", out var pageValue) && int.TryParse(pageValue, out var parsedPage))
+        {
+            currentPage = parsedPage;
+        }
+    }
+
+    private void NavigateBack()
+    {
+        if (!shouldStayOnPage)
+        {
+     
+            NavigationManager.NavigateTo($"{Uri}?filter={filter}&page={currentPage}");
+        }
+    }
+}
+

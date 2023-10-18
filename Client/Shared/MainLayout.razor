@@ -1,0 +1,17 @@
+﻿@inherits LayoutComponentBase
+
+<Toasts/>
+<div class="page">
+
+    <main>
+        <AuthorizeView>
+            <Authorized>
+                <Navbar />
+            </Authorized>
+        </AuthorizeView>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>

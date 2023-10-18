@@ -1,0 +1,46 @@
+﻿@typeparam TItem
+<div>
+    @if (Data != null)
+    {
+        foreach (var item in Data)
+        {
+            var Text = " " + TextField?.Invoke(item);
+            var Value = ValueField?.Invoke(item).ToString();
+            bool Checked = false;
+            if (SelectedValues.Contains(Value))
+            {
+                Checked = true;
+            }
+            <input type="checkbox" checked=@Checked @onchange="eventArgs => { CheckboxClicked(Value, eventArgs.Value); }" />
+            @Text <br />
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public IEnumerable<TItem> Data { get; set; }
+    [Parameter] public Func<TItem, string> TextField { get; set; }
+    [Parameter] public Func<TItem, object> ValueField { get; set; }
+    [Parameter] public List<string> SelectedValues { get; set; }
+    [Parameter] public Action<List<string>> OnSelectionChanged { get; set; }
+
+    public void CheckboxClicked(string aSelectedId, object aChecked)
+    {
+        if ((bool)aChecked)
+        {
+            if (!SelectedValues.Contains(aSelectedId))
+            {
+                SelectedValues.Add(aSelectedId);
+            }
+        }
+        else
+        {
+            if (SelectedValues.Contains(aSelectedId))
+            {
+                SelectedValues.Remove(aSelectedId);
+            }
+        }
+        OnSelectionChanged?.Invoke(SelectedValues);
+        StateHasChanged();
+    }
+}

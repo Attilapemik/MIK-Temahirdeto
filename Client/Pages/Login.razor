@@ -1,0 +1,99 @@
+﻿@inherits CommonComponentBase
+@page "/login"
+@using Microsoft.AspNetCore.WebUtilities
+@using Syncfusion.Blazor.Cards
+@inject IAuthService AuthService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ILocalStorageService LocalStorage
+@inject IRoleService RoleService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Login</PageTitle>
+<div class="container h-100">
+    <div class="row d-flex justify-content-center align-items-center h-100">
+        <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+            <div class="card bg-white text-dark" style="border-radius: 2rem;">
+                <div class="card-body p-5 text-center">
+                    <img class="mx-auto d-block" src="/icons/pemik_cimer.png" alt="Pannon Egyetem">
+                    <div class="mb-md-4 mt-md-4">
+                        <hr/>
+                        <h2 class="mb-2 mt-2 text-uppercase">Belépés</h2>
+                        <EditForm Model="user" OnSubmit="HandleLogin">
+                            <div class="form-outline form-white mb-4">
+                                <label class="form-label" for="username">KCA azonosító:</label>
+                                <InputText id="username" @bind-Value="user.Username" class="form-control form-control-lg focusable" />
+                                <ValidationMessage For="(() => user.Username)" />
+                            </div>
+
+                            <div class="form-outline form-white mb-4">
+                                <label class="form-label" for="password">KCA jelszó:</label>
+                                <InputText id="password" @bind-Value="user.Password" class="form-control form-control-lg" type="password" />
+                                <ValidationMessage For="(() => user.Password)" />
+                            </div>
+
+                            <div class="form-outline form-white mb-4">
+                                <label class="form-label" for="role">Szerepkör:</label>
+                                <InputSelect id="role" @bind-Value="user.RoleId" class="form-control form-control-lg">
+                                    @foreach (var role in RoleService.Roles)
+                                    {
+                                        <option value="@role.Id">@role.DisplayName</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <button type="submit" class="btn btn-outline-dark btn-lg px-5 mt-2">Bejelentkezés</button>
+                        </EditForm>
+                    </div>
+                    <div class="form-outline form-white mb-4">
+                        <a class="text-decoration-none" href="/">Vissza a témákhoz</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserLoginDto user = new UserLoginDto();
+
+    private string returnUrl = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RoleService.GetRoles();
+        user.RoleId = RoleService.Roles[0]?.Id.ToString() ?? string.Empty;
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("returnUrl", out var url))
+        {
+            returnUrl = url;
+        }
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("code", out var code))
+        {
+            if (code.Equals("401"))
+            {
+                ShowToast(Messages.Error, "Nincs jogosultsága a funkcióhoz vagy lejárt a munkamenet! Kérem jelentkezzen be újra!", ToastType.Danger);
+            }
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        var result = await AuthService.Login(user);
+        if (result != null)
+        {
+            if (result.Success)
+            {
+                await LocalStorage.SetItemAsync("authToken", result.Data);
+                await AuthStateProvider.GetAuthenticationStateAsync();
+                NavigateTo(returnUrl == "" ? "/themes" : returnUrl);
+            }
+            else
+            {
+                ShowToast("Sikertelen bejelentkezés", result.Message! , ToastType.Warning);
+            }
+        }
+        else
+        {
+            ShowToast(Messages.Error, Messages.RequestFailed, ToastType.Danger);
+        }
+    }
+}

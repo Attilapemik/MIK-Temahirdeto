@@ -1,0 +1,201 @@
+﻿@inherits CommonComponentBase
+@page "/theme/{id}"
+@page "/theme/{id}/{programmeId}"
+@attribute [Authorize]
+@inject IThemeService ThemeService
+@inject IInstructorService InstructorService
+@inject IProgrammeService ProgrammeService
+@inject IJSRuntime JsRuntime
+<PageTitle>Téma szerkesztése</PageTitle>
+
+<LoadingScreen IsLoading="@isLoading">
+    <div class="container">
+        <div class="row">
+            <div class="col-6">
+                <h2>Téma megtekintése</h2>
+            </div>
+            <div class="col-6" style="display: flex; flex-direction: column;">
+                <AuthorizeView Roles="Programme Leader">
+                    <div style="float: right;">
+                        <button @onclick="OnApproveTheme" class="btn btn-success" style="margin-right: 4px;">Jóváhagyás</button>
+                        <button @onclick="OnDenyTheme" class="btn btn-danger">Elutasítás</button>
+                    </div>
+                    <div style="float: right;">
+                        <label for="denyReason">Elutasítás indoka: </label>
+                        <input id="denyReason" @bind="DenyReason" max="300" class="form-control" />
+                    </div>
+                </AuthorizeView>
+            </div>
+        </div>
+        <EditForm Model="theme">
+            <DataAnnotationsValidator />
+            <div>
+                <label for="title">Téma címe: </label>
+                <InputText disabled="true" id="title" @bind-Value="theme.Title" class="form-control" />
+            </div>
+            <div>
+                <label for="description">Téma leírása: </label>
+                <InputTextArea disabled="true" id="desciprtion" @bind-Value="theme.Description" class="form-control" />
+            </div>
+            <div>
+                <label>Téma típusa:</label>
+                <InputText disabled="true" id="themeType" @bind-Value="theme.ThemeType" class="form-control" />
+            </div>
+            <AuthorizeView Roles="Head of department, Admin" Context="SelectInstructor">
+                <div>
+                    @if (theme.IsDualOrExternal)
+                    {
+                        <label for="instructor">Belső konzulens:</label>
+                    }
+                    else
+                    {
+                        <label for="instructor">Témavezető:</label>
+                    }
+                    <InputText disabled="true" id="createdat" @bind-Value="theme.InstructorName" class="form-control" />
+                </div>
+            </AuthorizeView>
+            <div>
+                <label for="createdat">Létrehozva: </label>
+                <InputText disabled="true" id="createdat" @bind-Value="theme.CreatedAt" class="form-control" />
+            </div>
+            <div>
+                @if (theme.IsDualOrExternal)
+                {
+                    <label for="externalName">Témavezető neve:</label>
+                }
+                else
+                {
+                    <label for="externalName">Külső konzulens neve:</label>
+                }
+                <InputText id="externalName" disabled="true" @bind-Value="theme.ExternalInstructorName" class="form-control focusable" />
+                <label for="externalCompany">Külső cég neve:</label>
+                <InputText id="externalCompany" disabled="true" @bind-Value="theme.ExternalCompanyName" class="form-control focusable" />
+            </div>
+            <div>
+                <label>Szakok: </label>
+                <table>
+                    @foreach (var p in theme.Programmes)
+                    {
+                        <tr>
+                            <td>
+                                @(p.ProgrammeName):
+                            </td>
+                            <td>
+                                @(p.GetApproval)
+                            </td>
+                            @if (p.IsApproved is not null)
+                            {
+                                <td>
+                                    @($" ({p.ApprovalDate})")
+                                </td>
+                            }
+                            @if (p.IsApproved == false)
+                            {
+                                <td>
+                                    (@(p.DenyReason))
+                                </td>
+                            }
+                        </tr>
+                    }
+                </table>
+            </div>
+            @if (theme.Students is not null && theme.Students.Any())
+            {
+                @if (theme.Students.Count == 1)
+                {
+                    <div>
+                        <label for="student">Hallgató neve: </label>
+                        <InputText disabled="true" id="student" @bind-Value="theme.Students.First().StudentName" class="form-control" />
+                    </div>
+                    <div>
+                        <label for="studentcode">Hallgató neptunkódja: </label>
+                        <InputText disabled="true" id="studentcode" @bind-Value="theme.Students.First().NeptunCode" class="form-control" />
+                    </div>
+                    <div>
+                        <label for="studentprogramme">Hallgató szak: </label>
+                        <InputText disabled="true" id="studentprogramme" @bind-Value="theme.Students.First().ProgrammeName" class="form-control" />
+                    </div>
+                }
+                else
+                {
+                    <div>
+                        <label>Hallgatók: </label>
+                        <table>
+                            @foreach (var s in theme.Students)
+                            {
+                                <tr>
+                                    <td>
+                                        <span title="@($"Szak: {s.ProgrammeName}")">@($"{s.StudentName} ({s.NeptunCode})")</span>
+                                    </td>
+                                </tr>
+                            }
+                        </table>
+                    </div>
+                }
+            }
+        </EditForm>
+        <div style="margin-top: 4px">
+            <GoBack Uri="/"></GoBack>
+        </div>
+    </div>
+</LoadingScreen>
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+    [Parameter]
+    public string programmeId { get; set; }
+
+    private string DenyReason { get; set; } = string.Empty;
+
+    ThemeShowDto theme = new ThemeShowDto();
+
+    public bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        theme = await ThemeService.GetThemeShow(id);
+        if (theme is null)
+        {
+            ShowToast(Messages.Error, ThemeService.ErrorMessage ?? "Nem sikerült betölteni a témát", ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        isLoading = false;
+    }
+
+    private async Task OnApproveTheme()
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Biztosan jóváhagyja a témát?");
+        if (confirmed)
+        {
+            var result = await ThemeService.ApproveThemeProgramme(new ThemeProgrammeFeedbackDto(int.Parse(id), int.Parse(programmeId)));
+            if (result.Success)
+            {
+                ShowToast("Sikeres módosítás", result.Message ?? "Téma jóváhagyva", ToastType.Success);
+                NavigateTo("/themesunderapproval");
+            }
+            else
+            {
+                ShowToast(Messages.Error, result.Message ?? "Nem sikerült jóváhagyni a témát", ToastType.Warning);
+            }
+        }
+    }
+    private async Task OnDenyTheme()
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Biztosan elutasítja a témát?");
+        if (confirmed)
+        {
+            var result = await ThemeService.DenyThemeProgramme(new ThemeProgrammeFeedbackDto(int.Parse(id), int.Parse(programmeId), DenyReason));
+            if (result.Success)
+            {
+                ShowToast("Sikeres módosítás", result.Message ?? "Téma elutasítva", ToastType.Success);
+                NavigateTo("/themesunderapproval");
+            }
+            else
+            {
+                ShowToast(Messages.Error, result.Message ?? "Nem sikerült elutasítani a témát", ToastType.Warning);
+            }
+        }
+    }
+}

@@ -1,0 +1,206 @@
+﻿@inherits CommonComponentBase
+@page "/edittheme/{id}"
+@attribute [Authorize]
+@inject IThemeService ThemeService
+@inject IInstructorService InstructorService
+@inject IProgrammeService ProgrammeService
+@inject ICompanyService CompanyService
+
+<PageTitle>Téma szerkesztése</PageTitle>
+   
+<LoadingScreen IsLoading="@isLoading">
+    <div class="container">
+        <h2>Téma szerkesztése</h2>
+        <EditForm Model="theme" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <div>
+                <label for="title">Téma címe: </label>
+                <InputText id="title" @bind-Value="theme.Title" class="form-control focusable" />
+                <ValidationMessage For="@(() => theme.Title)" />
+            </div>
+            <div>
+                <label for="description">Téma leírása: </label>
+                <InputTextArea id="desciprtion" @bind-Value="theme.Description" class="form-control" />
+                <ValidationMessage For="@(() => theme.Description)" />
+            </div>
+            <div>
+                <label>Téma típusa:</label>
+                <InputSelect id="themeType" @bind-Value="SelectedType" class="form-control" @oninput="OnTypeValueChanged">
+                    @foreach (var type in Types)
+                    {
+                        <option value="@type">@type</option>
+                    }
+                </InputSelect>
+            </div>
+            <AuthorizeView Roles="Head of department, Admin" Context="SelectInstructor">
+                <div>
+                    @if (theme.IsDual || theme.IsExternal)
+                    {
+                        <label for="instructor">Belső konzulens:</label>
+                    }
+                    else
+                    {
+                        <label for="instructor">Témavezető:</label>
+                    }
+                    @if (InstructorService.Instructors != null)
+                    {
+                        <InputSelect id="instructor" @bind-Value="theme.InstructorName" class="form-control">
+                            @foreach (var instructor in InstructorService.Instructors)
+                            {
+                                <option value="@instructor.Username">@instructor.Username</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => theme.InstructorName)" />
+                    }
+                </div>
+            </AuthorizeView>
+            <div>
+                <label for="createdat">Létrehozva: </label>
+                <input type="text" disabled id="createdat" value="@(theme.CreatedAt.ToString())" class="form-control" />
+            </div>
+            <div>
+                @if (theme.IsDual || theme.IsExternal)
+                {
+                    <label for="externalName">Témavezető neve:</label>
+                }
+                else
+                {
+                    <label for="externalName">Külső konzulens neve:</label>
+                }
+                <InputText id="externalName" disabled="@(!theme.IsExternal && !theme.IsDual)" @bind-Value="theme.ExternalInstructorName" class="form-control focusable" />
+                <ValidationMessage For="@(() => theme.ExternalInstructorName)" />
+
+                <label for="externalCompany">Külső cég neve:</label>
+                <InputSelect id="externalCompany" @bind-Value="theme.ExternalCompanyId" disabled="@(!theme.IsExternal && !theme.IsDual)" class="form-control focusable">
+                    @if (theme.ExternalCompanyId == null)
+                    {
+                        <option selected value="null"></option>
+                    }
+                    else
+                    {
+                        <option value="null"></option>
+                    }
+                    @foreach (var item in CompanyService.Companies)
+                    {
+                        @if (item.Id == theme.ExternalCompanyId)
+                        {
+                            <option selected value="@item.Id">@item.Name</option>
+                        }
+                        else
+                        {
+                            <option value="@item.Id">@item.Name</option>
+                        }
+                    }
+                </InputSelect>
+                <ValidationMessage For="@(() => theme.ExternalCompanyId)" />
+            </div>
+            <div>
+                <label>Szakok: </label>
+                <CheckBoxList Data="@ProgrammeService.Programmes"
+                          TextField="@((item)=>item.Name)"
+                          ValueField="@((item)=>item.Id)"
+                          SelectedValues="@SelectedIds" />
+            </div>
+            <br />
+            <CommonButtons GoBackUri="/"></CommonButtons>
+        </EditForm>
+    </div>
+</LoadingScreen>
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+
+    public ThemeEditDto theme = new ThemeEditDto();
+    protected List<string> SelectedIds = new List<string>();
+
+    private string SelectedType = ThemeTypes.Internal;
+    public List<string> Types { get; set; } = new List<string> { ThemeTypes.Internal, ThemeTypes.External, ThemeTypes.Dual };
+
+    public bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        theme = await ThemeService.GetThemeEdit(id);
+        if (theme is null)
+        {
+            ShowToast(Messages.Error, ThemeService.ErrorMessage ?? "Nem sikerült betölteni a témát", ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        SelectedIds = theme.SelectedProgrammes.Select(sp => sp.ToString()).ToList();
+
+        if (await UserIsInRole(new string[] { Roles.Admin, Roles.HeadOfDepartment }))
+        {
+            await InstructorService.GetInstructors();
+            if (InstructorService.ErrorMessage is not null)
+            {
+                ShowToast(Messages.Error, InstructorService.ErrorMessage, ToastType.Danger);
+                NavigateBack();
+                return;
+            }
+        }
+        await ProgrammeService.GetProgrammes();
+        if (ProgrammeService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, ProgrammeService.ErrorMessage, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        await CompanyService.GetCompanies();
+        if (CompanyService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, CompanyService.ErrorMessage, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        isLoading = false;
+    }
+
+    async void HandleSubmit()
+    {
+        theme.SelectedProgrammes = SelectedIds.Select(int.Parse).ToList();
+        if (!SelectedIds.Any())
+        {
+            ShowToast(Messages.Warning, "Legalább egy szakot kötelező megjelölni", ToastType.Warning);
+            return;
+        }
+
+        var isAllOneProgrammeType = ProgrammeService.Programmes
+        .Where(p => theme.SelectedProgrammes.Contains(p.Id))
+        .All(p => p.ProgrammeType.Equals(ProgrammeService.Programmes
+            .Where(p => theme.SelectedProgrammes.Contains(p.Id)).ToList()[0].ProgrammeType));
+
+        if (!isAllOneProgrammeType)
+        {
+            ShowToast(Messages.Warning, "A téma nem hirdethető egyszerre BSc és MSc szakon is!", ToastType.Warning);
+            return;
+        }
+
+        var result = await ThemeService.EditTheme(theme);
+        if (result is not null)
+        {
+            if (result.Success)
+            {
+                ShowToast(Messages.SuccessEdit, $"A(z) {theme.Title} téma módosítva az adatbázisban", ToastType.Success);
+                NavigateBack();
+            }
+            else
+            {
+                ShowToast(Messages.FailedEdit, result.Message!, ToastType.Warning);
+            }
+        }
+        else
+        {
+            ShowToast(Messages.Error, Messages.UploadFailed, ToastType.Danger);
+        }
+    }
+
+    private Task OnTypeValueChanged(ChangeEventArgs e)
+    {
+        theme.IsExternal = e.Value.ToString() == ThemeTypes.External;
+        theme.IsDual = e.Value.ToString() == ThemeTypes.Dual;
+
+        return Task.CompletedTask;
+    }
+}

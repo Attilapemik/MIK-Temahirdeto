@@ -1,0 +1,124 @@
+﻿@using System.Security.Claims;
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ISemesterService<SemesterGetDto> SemesterService
+@inject NavigationManager NavigationManager
+
+<AuthorizeView Roles="Admin, Head of department">
+<style>
+    .dropdown:hover .dropdown-menu {
+    display: block;
+    }
+    .dropdown .dropdown-menu {
+    display: none;
+    }
+</style>
+</AuthorizeView>
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav">
+            <AuthorizeView Roles="Instructor">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/themes">Saját témáim</NavLink>
+                </li>
+            </AuthorizeView>
+            <AuthorizeView Roles="Head of department">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/themes">Tanszéki témák</NavLink>
+                </li>
+            </AuthorizeView>
+            <AuthorizeView Roles="Programme Leader">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/themesunderapproval">Jóváhagyandó témák</NavLink>
+                </li>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="Instructor, Head of department">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/allthemes">Összes téma</NavLink>
+                </li>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="Instructor, Head of department">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/createtheme">Új téma</NavLink>
+                </li>
+            </AuthorizeView>
+
+            <AuthorizeView Roles="Admin">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/instructors">Felhasználók</NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/themes">Témák</NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/allthemes">Összes téma</NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/programmes">Szakok</NavLink>
+                </li>
+                <li class="nav-item dropdown">
+                    <NavLink class="nav-link dropdown-toggle" href="/companies" id="companyDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        Cégek
+                    </NavLink>
+                    <div class="dropdown-menu" aria-labelledby="companyDropdown">
+                        <NavLink class="dropdown-item" href="/companies">Listázása</NavLink>
+                        <NavLink class="dropdown-item" href="/delcompanies">Töröltek</NavLink>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/semesters">Időszakok</NavLink>
+                </li>
+            </AuthorizeView>
+            <AuthorizeView Roles="Admin, Head of department">
+                <li class="nav-item dropdown">
+                    <NavLink class="nav-link dropdown-toggle" href="/export" id="exportDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        Exportálás
+                    </NavLink>
+                    <div class="dropdown-menu" aria-labelledby="exportDropdown">
+                        <NavLink class="dropdown-item" href="/export">Mind</NavLink>
+                        <NavLink class="dropdown-item" href="/multipleneptuncodes">Többszörös neptun kódok</NavLink>
+                    </div>
+                </li>
+            </AuthorizeView>
+        </ul>
+        <span class="ms-auto mb-2 mb-lg-0">
+            <span style="left: 50%; top: 25%; position: absolute;">Aktív időszak: @activeSemester</span>
+            <span>@userName (@userRole)</span>
+            <LoginLogoutButton />
+        </span>
+    </div>
+</nav>
+
+@code {
+    string userName, userRole;
+    string activeSemester;
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        userName = state.User.Identity?.Name ?? "N/A";
+        userRole = GetRoleName(state.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value ?? "unknown");
+        await SemesterService.GetActiveSemester();
+        activeSemester = SemesterService.Semester?.Name ?? "N/A";
+        if (state.User.IsInRole("Programme Leader"))
+        {
+            NavigationManager.NavigateTo("/themesunderapproval");
+        }
+    }
+    private string GetRoleName(string value)
+    {
+        switch (value)
+        {
+            case "Instructor":
+                return "Oktató";
+            case "Programme Leader":
+                return "Szakfelelős";
+            case "Head of department":
+                return "Tanszéki admin";
+            case "Admin":
+                return "Admin";
+            default:
+                return "N/A";
+        }
+    }
+}

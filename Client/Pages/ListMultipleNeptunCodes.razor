@@ -1,0 +1,49 @@
+﻿@inherits CommonComponentBase
+@page "/multipleneptuncodes"
+@attribute [Authorize]
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.Spinner
+@inject IThemeService ThemeService
+
+<PageTitle>Többszörös Neptun Kódok</PageTitle>
+
+<div class="container" style="max-width: 100%;">
+    <h2>Exportálás</h2>
+    <br />
+    <SfGrid ID="Grid" @ref="DefaultGrid" DataSource="@ThemeService.StudentMultipleNeptunCodes" AllowSorting AllowFiltering AllowTextWrap
+            AllowExcelExport="true" Toolbar="@(new List<string>() { "ExcelExport" })">
+        <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel"></GridFilterSettings>
+        <GridEvents OnToolbarClick="ToolbarClickHandler" TValue="StudentMultipleNeptunDto"></GridEvents>
+        <SfSpinner @bind-Visible="@visible"></SfSpinner>
+    </SfGrid>
+</div>
+
+@code {
+    public bool visible = true;
+
+    private SfGrid<StudentMultipleNeptunDto> DefaultGrid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ThemeService.GetMultipleNeptunCodes();
+        if (ThemeService.ErrorMessage is null)
+        {
+            visible = false;
+        }
+        else
+        {
+            ShowToast(Messages.Error, ThemeService.ErrorMessage, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+    }
+
+    public async Task ToolbarClickHandler(Syncfusion.Blazor.Navigations.ClickEventArgs args)
+    {
+        if (args.Item.Id == "Grid_excelexport") //Id is combination of Grid's ID and itemname
+        {
+            ShowToast("Sikeres Letöltés", string.Empty, ToastType.Success);
+            await this.DefaultGrid.ExcelExport();
+        }
+    }
+}

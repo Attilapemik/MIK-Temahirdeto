@@ -1,0 +1,77 @@
+﻿@using PannonBlazor.Client.Services.ComponentServices.Toast;
+@inject IToastService ToastService
+
+@if (ToasList.Any())
+{
+    <div style="position: absolute; top: 0; right: 0;">
+        <CascadingValue Value="this">
+            <div class="position-fixed end-0 p-3" style="z-index: 11">
+                @foreach (var toast in ToasList.OrderBy(t => t.TimeStamp))
+                {
+                    <Toast ToastSettings="@toast.ToastSettings" ToastId="@toast.Id" />
+                }
+            </div>
+        </CascadingValue>
+    </div>
+}
+
+@code {
+    [Parameter] public int TimeOut { get; set; } = 5;
+
+    internal List<Services.ComponentServices.Toast.Toast> ToasList { get; set; } = new List<global::PannonBlazor.Client.Services.ComponentServices.Toast.Toast>();
+
+    protected override void OnInitialized()
+    {
+        ToastService.OnShow += ShowToast;
+    }
+
+    private void ShowToast(string title, string message, ToastType type)
+    {
+        InvokeAsync(() =>
+        {
+            var settings = BuildToastSettings(type, title, message);
+            var toast = new Services.ComponentServices.Toast.Toast(Guid.NewGuid(), DateTime.Now, settings);
+            ToasList.Add(toast);
+
+            var timeout = TimeOut * 1000;
+            var toastTimer = new System.Timers.Timer(timeout);
+            toastTimer.Elapsed += (s, e) =>
+            {
+                RemoveToast(toast.Id);
+                toastTimer.Stop();
+            };
+            toastTimer.AutoReset = false;
+            toastTimer.Start();
+            StateHasChanged();
+        });
+    }
+
+    public void RemoveToast(Guid toastId)
+    {
+        InvokeAsync(() =>
+        {
+            var toastInstance = ToasList.FirstOrDefault(x => x.Id == toastId);
+            ToasList.Remove(toastInstance);
+            StateHasChanged();
+        });
+    }
+
+    private ToastSettings BuildToastSettings(ToastType type, string title, string message)
+    {
+        switch (type)
+        {
+            case ToastType.Primary:
+                return new ToastSettings(title, message, type, "text-white", "bg-primary");
+            case ToastType.Danger:
+                return new ToastSettings(title, message, type, "text-white", "bg-danger");
+            case ToastType.Warning:
+                return new ToastSettings(title, message, type, "text-dark", "bg-warning");
+            case ToastType.Success:
+                return new ToastSettings(title, message, type, "text-white", "bg-success");
+            case ToastType.Info:
+                return new ToastSettings(title, message, type, "text-dark", "bg-info");
+            default:
+                return new ToastSettings(title, message, type, "text-white", "bg-primary");
+        }
+    }
+}

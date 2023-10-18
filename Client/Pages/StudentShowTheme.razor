@@ -1,0 +1,235 @@
+﻿@page "/showtheme/{id}"
+@using Syncfusion.Blazor.Cards
+@inject IThemeService ThemeService
+@inject IProgrammeService ProgrammeService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Téma megtekintése</PageTitle>
+<HeadContent>
+    <link href="/tailwindcss/tailwind.min.css" rel="stylesheet">
+    <style>
+        td {
+            padding: 1rem;
+        }
+
+        ul {
+            list-style-position: inside;
+        }
+
+        textarea {
+            height: 12rem;
+        }
+
+        button {
+            background-color: rgb(90,60,90) !important;
+            border: none !important;
+        }
+    </style>
+</HeadContent>
+<LoadingScreen IsLoading="@isLoading">
+    @if (ThemeService.ErrorMessage is not null)
+    {
+        <div class="container">
+            <div class="row">
+                <SfCard ID="NewIconCard">
+                    <div class="newIcon">Hiba</div>
+                    <CardHeader Title="@ThemeService.ErrorMessage" />
+                </SfCard>
+            </div>
+        </div>
+        <style>
+            #NewIconCard {
+                padding: 50px;
+                margin: 16px;
+            }
+
+            .newIcon {
+                background: red;
+                border-radius: 12px;
+                border-radius: 12px;
+                font-family: HelveticaNeue-Medium, 'Segoe UI';
+                font-weight: 500;
+                color: #ffffff;
+                margin-left: 16px;
+                font-size: 14px;
+                width: 58px;
+                height: 24px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                letter-spacing: 0.4px;
+            }
+        </style>
+    }
+    else
+    {
+        <div class="container">
+            <nav aria-label="Breadcrumb" class="flex">
+                <ol role="list"
+                    class="flex overflow-hidden rounded-lg border border-gray-200 text-gray-600">
+                    <li class="flex items-center">
+                        <a href="#"
+                           class="flex h-10 items-center bg-gray-100 px-4 transition hover:text-gray-900">
+                            <i class="fa-solid fa-house"></i>
+                            <span class="ml-1.5 text-xs font-medium"> Témák </span>
+                        </a>
+                    </li>
+
+                    <li class="relative flex items-center">
+                        <span class="absolute inset-y-0 -left-px h-10 w-4 bg-gray-100 [clip-path:_polygon(0_0,_0%_100%,_100%_50%)]">
+                        </span>
+                        <a href="#"
+                           class="flex h-10 items-center bg-white pl-8 pr-4 text-xs font-medium transition hover:text-gray-900">
+                            @ThemeService.ThemeStudentShow.Title
+                        </a>
+                    </li>
+                </ol>
+            </nav>
+            <table class="w-full my-4 shadow-md rounded">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <td colspan="2" class="text-center">
+                            <h1 class="text-lg font-bold p-2">@(ThemeService.ThemeStudentShow.Title)</h1>
+                        </td>
+                    </tr>
+                </thead>
+
+                <tbody class="divide-y divide-gray-300">
+                    <tr>
+                        <td style="width: 30%">
+                            <label for="description">Téma leírása: </label>
+                        </td>
+                        <td>
+                            <p class="text-justify">@(ThemeService.ThemeStudentShow.Description)</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td>
+                            <label>Téma típusa:</label>
+                        </td>
+                        <td>
+                            <span class="whitespace-nowrap rounded-full bg-green-100 px-2.5 py-0.5 text-sm text-green-500">
+                                @(ThemeService.ThemeStudentShow.ThemeType)
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            @if (ThemeService.ThemeStudentShow.ThemeType != ThemeTypes.Internal)
+                            {
+                                <label for="instructor">Belső konzulens:</label>
+                            }
+                            else
+                            {
+                                <label for="instructor">Témavezető:</label>
+                            }
+                        </td>
+                        <td>
+                            <p>@(ThemeService.ThemeStudentShow.InstructorName)</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            @if (ThemeService.ThemeStudentShow.ThemeType != ThemeTypes.Internal)
+                            {
+                                <label for="instructor">Belső konzulens email:</label>
+                            }
+                            else
+                            {
+                                <label for="instructor">Témavezető email:</label>
+                            }
+                        </td>
+                        <td>
+                            <div class="flex justify-start gap-2">
+                                <div>
+                                    @(ThemeService.ThemeStudentShow.InstructorEmail)
+
+                                </div>
+                                <div>
+                                    <a target="_blank" class="text-justify" href="https://mail.google.com/mail/?view=cm&fs=1&to=@System.Net.WebUtility.UrlEncode($"{ThemeService.ThemeStudentShow.InstructorEmail}")&su=@System.Net.WebUtility.UrlEncode($"{ThemeService.ThemeStudentShow.Title}") téma érdeklődés&body=Tisztelt @System.Net.WebUtility.UrlEncode($"{ThemeService.ThemeStudentShow.InstructorName}!")">
+                                        <svg viewBox="374.018 175.923 360 269.577" width="20" height="20">
+                                            <path d="M158 391v-142l-82-63V361q0 30 30 30" fill="#4285f4" transform="matrix(1, 0, 0, 1, 298.01828, 54.499992)"></path>
+                                            <path d="M 154 248l102 77l102-77v-98l-102 77l-102-77" fill="#ea4335" transform="matrix(1, 0, 0, 1, 298.01828, 54.499992)"></path>
+                                            <path d="M354 391v-142l82-63V361q0 30-30 30" fill="#34a853" transform="matrix(1, 0, 0, 1, 298.01828, 54.499992)"></path>
+                                            <path d="M76 188l82 63v-98l-30-23c-27-21-52 0-52 26" fill="#c5221f" transform="matrix(1, 0, 0, 1, 298.01828, 54.499992)"></path>
+                                            <path d="M436 188l-82 63v-98l30-23c27-21 52 0 52 26" fill="#fbbc04" transform="matrix(1, 0, 0, 1, 298.01828, 54.499992)"></path>
+                                        </svg>
+                                    </a>
+                                </div>
+                                <div>
+                                    <a target="_blank" class="text-justify" href="mailto:@System.Net.WebUtility.UrlEncode($"{ThemeService.ThemeStudentShow.InstructorEmail}")?subject=@(ThemeService.ThemeStudentShow.Title) téma érdeklődés&body=Tisztelt @(ThemeService.ThemeStudentShow.InstructorName)!">
+                                        <svg viewBox="260.018 75.613 512 399.625" width="20" height="20">
+                                            <g transform="matrix(1, 0, 0, 1, 260.018311, 19.425379)">
+                                                <path class="st0" d="M510.746,110.361c-2.128-10.754-6.926-20.918-13.926-29.463c-1.422-1.794-2.909-3.39-4.535-5.009
+		                                            c-12.454-12.52-29.778-19.701-47.531-19.701H67.244c-17.951,0-34.834,7-47.539,19.708c-1.608,1.604-3.099,3.216-4.575,5.067
+		                                            c-6.97,8.509-11.747,18.659-13.824,29.428C0.438,114.62,0,119.002,0,123.435v265.137c0,9.224,1.874,18.206,5.589,26.745
+		                                            c3.215,7.583,8.093,14.772,14.112,20.788c1.516,1.509,3.022,2.901,4.63,4.258c12.034,9.966,27.272,15.45,42.913,15.45h377.51
+		                                            c15.742,0,30.965-5.505,42.967-15.56c1.604-1.298,3.091-2.661,4.578-4.148c5.818-5.812,10.442-12.49,13.766-19.854l0.438-1.05
+		                                            c3.646-8.377,5.497-17.33,5.497-26.628V123.435C512,119.06,511.578,114.649,510.746,110.361z M34.823,99.104
+		                                            c0.951-1.392,2.165-2.821,3.714-4.382c7.689-7.685,17.886-11.914,28.706-11.914h377.51c10.915,0,21.115,4.236,28.719,11.929
+		                                            c1.313,1.327,2.567,2.8,3.661,4.272l2.887,3.88l-201.5,175.616c-6.212,5.446-14.21,8.443-22.523,8.443
+		                                            c-8.231,0-16.222-2.99-22.508-8.436L32.19,102.939L34.823,99.104z M26.755,390.913c-0.109-0.722-0.134-1.524-0.134-2.341V128.925
+		                                            l156.37,136.411L28.199,400.297L26.755,390.913z M464.899,423.84c-6.052,3.492-13.022,5.344-20.145,5.344H67.244
+		                                            c-7.127,0-14.094-1.852-20.142-5.344l-6.328-3.668l159.936-139.379l17.528,15.246c10.514,9.128,23.922,14.16,37.761,14.16
+		                                            c13.89,0,27.32-5.032,37.827-14.16l17.521-15.253L471.228,420.18L464.899,423.84z M485.372,388.572
+		                                            c0,0.803-0.015,1.597-0.116,2.304l-1.386,9.472L329.012,265.409l156.36-136.418V388.572z"></path>
+                                            </g>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
+
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <label for="studentcode">Hallgató: </label>
+                        </td>
+                        <td>
+                            @if (ThemeService.ThemeStudentShow.NeptunCodes == null || string.IsNullOrWhiteSpace(ThemeService.ThemeStudentShow.NeptunCode) || !ThemeService.ThemeStudentShow.NeptunCode.Equals("több"))
+                            {
+                                <span>@(ThemeService.ThemeStudentShow.NeptunCode)</span>
+                            }
+                            else
+                            {
+                                <span title="@String.Join(", ",ThemeService.ThemeStudentShow.NeptunCodes)">@(ThemeService.ThemeStudentShow.NeptunCode)</span>
+                            }
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <div>
+                <ul>
+                    @foreach (var p in ThemeService.ThemeStudentShow.Programmes)
+                    {
+                        <span class="badge rounded-pill mx-1" style="background-color: @p.Color">@p.Name</span>
+                    }
+                </ul>
+            </div>
+            <br>
+            <GoBack Uri="/"></GoBack>
+        </div>
+    }
+</LoadingScreen>
+@code {
+
+    [Parameter]
+    public string id { get; set; }
+
+    private bool isLoading = true;
+    private bool? success = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ThemeService.GetThemeForStudent(id);
+        if (ThemeService.ErrorMessage is not null)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", ThemeService.ErrorMessage);
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+        isLoading = false;
+    }
+}

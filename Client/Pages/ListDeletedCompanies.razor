@@ -1,0 +1,77 @@
+﻿@inherits CommonComponentBase
+@page "/delcompanies"
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject ICompanyService CompanyService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Törölt Cégek</PageTitle>
+<LoadingScreen IsLoading="isLoading">
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <h2 style="float: left;">Törölt Cégek</h2>
+            </div>
+            <div class="col">
+                <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/createcompany?returnUrl=companies")'>Új Cég</button>
+            </div>
+        </div>
+        @if (CompanyService.Companies.Count == 0)
+        {
+            <div class="row">
+                <span>Nem található törölt cég az adatbázisban</span>
+            </div>
+        }
+        else
+        {
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th colspan="3">Név</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var company in CompanyService.Companies)
+                    {
+                        <tr>
+                            <td>@company.Name</td>
+                            <td><button type="button" class="btn btn-success" style="float: right;" @onclick="(() => RestoreCompany(company.Id))">Visszaállítás</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</LoadingScreen>
+@code {
+    private bool isLoading = true;
+    protected override async Task OnInitializedAsync()
+    {
+        await CompanyService.GetCompanies(false);
+        if (CompanyService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, CompanyService.ErrorMessage, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        isLoading = false;
+    }
+
+    private async void RestoreCompany(int companyId)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Biztosan vissza szeretnéd állítani a céget?"))
+            return;
+
+        await CompanyService.RestoreCompany(companyId);
+
+        if (CompanyService.ErrorMessage is null)
+        {
+            ShowToast(Messages.SuccessDelete, $"A '{companyId}' azonosítójú cég vissza lett állítva", ToastType.Success);
+            ReloadPage();
+        }
+        else
+        {
+            ShowToast(Messages.FailedDelete, CompanyService.ErrorMessage ?? "Nem sikerült visszaállítani a céget", ToastType.Danger);
+        }
+    }
+}
+

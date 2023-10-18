@@ -1,0 +1,598 @@
+﻿@inherits CommonComponentBase
+@page "/themes"
+@attribute [Authorize]
+@inject IThemeService ThemeService
+@inject ISemesterService<SemesterDto> SemesterService
+@inject IJSRuntime JsRuntime
+@implements IDisposable
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids;
+@using Syncfusion.Blazor.Navigations
+@using Syncfusion.Blazor.Popups
+
+<PageTitle>Témák</PageTitle>
+
+<LoadingScreen IsLoading="@isLoading">
+    @if (ThemeService.Themes.Count > 0)
+    {
+        <style>
+            .e-footer-content .e-btn.e-flat:not([DISABLED]) {
+                background: #ca3c3c;
+                color: #ffffff;
+            }
+
+                .e-footer-content .e-btn.e-flat:not([DISABLED]):hover {
+                    background: #ff0000;
+                    color: #ffffff;
+                }
+        </style>
+        <SfDialog Height="30%" Width="30%" ShowCloseIcon="true" @bind-Visible="modalVisible">
+            <DialogTemplates>
+                <Header> Hallgató törlése témáról </Header>
+                <Content>
+                    <label>Melyik hallgatót szeretné törölni?</label>
+                    <br />
+                    <SfDropDownList DataSource="students" TItem="Student" TValue="string" @bind-Value="selectedStudentCode">
+                        <DropDownListTemplates TItem="Student">
+                            <ItemTemplate>
+                                <span>@($"{context.StudentName} ({context.NeptunCode})")</span>
+                            </ItemTemplate>
+                        </DropDownListTemplates>
+                        <DropDownListFieldSettings Value="NeptunCode" Text="StudentName"></DropDownListFieldSettings>
+                    </SfDropDownList>
+                </Content>
+            </DialogTemplates>
+            <DialogButtons>
+                <DialogButton Content="Töröl" OnClick="@RemoveStudent" />
+            </DialogButtons>
+            <DialogAnimationSettings Effect="DialogEffect.FadeZoom"></DialogAnimationSettings>
+        </SfDialog>
+    }
+    @if (ThemeService.Themes.Count == 0 && SemesterService.Semesters.Any(s => s.IsActive && s.IsVisibleInstructor == false))
+    {
+        <div class="container">
+            <p>Jelenleg nincsenek megjelenítendő Témák</p>
+        </div>
+    }
+    else if (!SemesterService.Semesters.Any(s => s.IsActive))
+    {
+        <div class="container">
+            <p>Jelenleg nincs témahirdetési időszak</p>
+        </div>
+    }
+    else if (ThemeService.Themes.Count == 0)
+    {
+        <div class="container">
+            <div class="row">
+                <div class="col-6">
+                    <h2>Nem rögzítettek még Témát</h2>
+                </div>
+                <div class="col-6">
+                    <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/createtheme?returnUrl=themes")'>Új téma</button>
+                </div>
+            </div>
+        </div>
+    }
+    else if (ThemeService.Themes.Count > 0)
+    {
+        <div class="container">
+            <div class="row">
+                <div class="col">
+                    <AuthorizeView Roles="@Roles.Instructor">
+                        <h2>Tanszéki témák</h2>
+                    </AuthorizeView>
+                    <AuthorizeView Roles="@Roles.HeadOfDepartment">
+                        <h2>Tanszéki témák</h2>
+                    </AuthorizeView>
+                    <AuthorizeView Roles="@Roles.Admin">
+                        <h2>Témák</h2>
+                    </AuthorizeView>
+                </div>
+                <div class="col">
+                    @if (SelectedRows.Any() && nextSemesters.Any())
+                    {
+                        <label>Honnan:</label>
+                    }
+                    <select class="form-select" @onchange="@OnSelectAll">
+                        @foreach (var semester in SemesterService.Semesters)
+                        {
+                            if (themeDto.FromSemester == semester.Id)
+                            {
+                                <option value="@semester.Id" selected>@semester.Name</option>
+                            }
+                            else
+                            {
+                                <option value="@semester.Id">@semester.Name</option>
+                            }
+                        }
+                    </select>
+                </div>
+                @if (SelectedRows.Any() && nextSemesters.Any())
+                {
+                    <div class="col-5">
+                        <div class="row">
+                            <label>Hova:</label>
+                            <div class="col">
+                                <select class="form-select" @onchange="@OnSelect">
+                                    @foreach (var semester in nextSemesters)
+                                    {
+                                        if (themeDto.ToSemester == default)
+                                        {
+                                            themeDto.ToSemester = semester.Id;
+                                        }
+                                        if (themeDto.ToSemester == semester.Id)
+                                        {
+                                            <option value="@semester.Id" selected>@semester.Name</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="@semester.Id">@semester.Name</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="col">
+                                <button type="button" class="btn btn-primary" @onclick='() => CopyThemesToSemester()'>Másolás másik időszakba</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+                <div class="col">
+                    <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/createtheme?returnUrl=themes")'>Új téma</button>
+                </div>
+            </div>
+            <br />
+            <div>
+                <SfGrid ID="Grid" @ref="@Grid" DataSource="@ThemeService.Themes" AllowSorting AllowPaging AllowFiltering
+                            AllowTextWrap AllowSelection ContextMenuItems="@(contextMenuItems)" @onmousedown="HandleMouseDown" AllowExcelExport>
+                @if (isInRole)
+                    {
+                        <GridTemplates>
+                            <ToolbarTemplate>
+                                <SfToolbar>
+                                    <ToolbarEvents Clicked="ToolbarClickHandler"></ToolbarEvents>
+                                    <ToolbarItems>
+                                        <ToolbarItem Type="@ItemType.Button" PrefixIcon="e-excelexport e-icons e-btn-icon e-icon-left" Id="ExcelExport" TooltipText="Excelbe Exportálás" Text="Exportálás"></ToolbarItem>
+                                    </ToolbarItems>
+                                </SfToolbar>
+                            </ToolbarTemplate>
+                        </GridTemplates>
+                        <GridEvents ContextMenuOpen="ContextMenuOpened" OnActionComplete="ActionCompletedHandler" ContextMenuItemClicked="OnContextMenuClick"
+                            RowSelected="SelectHandler" RowDeselected="DeselectHandler" OnToolbarClick="ToolbarClickHandler"
+                            TValue="ThemeDto" />
+                    }
+                    else
+                    {
+                        <GridEvents ContextMenuOpen="ContextMenuOpened" OnActionComplete="ActionCompletedHandler" ContextMenuItemClicked="OnContextMenuClick"
+                            RowSelected="SelectHandler" RowDeselected="DeselectHandler"
+                            TValue="ThemeDto" />
+                    }
+                    <GridSelectionSettings Type="Syncfusion.Blazor.Grids.SelectionType.Multiple" />
+                    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
+                    <GridColumns>
+                        <GridColumn Type="ColumnType.CheckBox" Width="25" AllowFiltering="false"></GridColumn>
+                        <GridColumn Field=@nameof(ThemeDto.Title) HeaderText="Cím" Width="30%"></GridColumn>
+                        <GridColumn Field=@nameof(ThemeDto.ThemeType) HeaderText="Téma típusa"></GridColumn>
+                        <GridColumn Field=@nameof(ThemeDto.Instructor) HeaderText="Témavezető/belső konzulens" AllowFiltering></GridColumn>
+                        <GridColumn Field=@nameof(ThemeDto.ExternalInstructorName) HeaderText="Témavezető/külső konzulens" AllowFiltering></GridColumn>
+                        <GridColumn Field=@nameof(ThemeDto.StatusName) HeaderText="Státusz" AllowFiltering="false">
+  
+                            <Template>
+                                 @{
+                                    var theme = context as ThemeDto;
+                                    if (!theme.StatusName.Equals("Aktív"))
+                                    {
+                                        <SfButton CssClass="btn btn-primary" IconCss="e-icons e-eye" OnClick="@(()=>ActivateTheme(theme.Id))" Title="Aktiválás"></SfButton>
+                                        <div>@("Aktiválás")</div>
+                                    }
+                                    else
+                                    {
+
+                                        
+                                        <SfButton CssClass="btn btn-primary" IconCss="e-icons e-eye" Disabled="true" Title="Ez a téma jelenleg inaktív státuszban van">
+                                            
+                                        </SfButton>
+                                    }
+
+                                    if (theme.StatusName.Equals("Aktív"))
+                                    {
+                                        <SfButton CssClass="btn btn-primary" IconCss="e-icons e-eye" OnClick="@(()=>InactivateTheme(theme.Id))" Title="inaktiválás"></SfButton>
+                                        <div>@("Inaktiválás")</div>
+                                    }
+                                    else
+                                    {
+
+                                        <SfButton CssClass="btn btn-primary" IconCss="e-icons e-eye" Disabled="true" Title="Ez a téma jelenleg aktív státuszban van">
+                                        </SfButton>
+                                    }
+                                }
+                            </Template>
+                            
+                        </GridColumn>
+                        <GridColumn Field="@nameof(ThemeDto.StudentCode)" HeaderText="Hallgató" AllowFiltering="false"></GridColumn>
+                        <GridColumn Field="@nameof(ThemeDto.CreatedAt)" HeaderText="Létrehozva" AllowFiltering="false"></GridColumn>
+                        <GridColumn HeaderText="Műveletek" TextAlign="TextAlign.Left" AllowFiltering="false">
+                            <Template>
+                                @{
+                                    var theme = context as ThemeDto;
+                                    <SfButton CssClass="btn btn-primary" IconCss="e-icons e-eye" OnClick="@(()=>ShowTheme(theme.Id))" Title="Megtekintés"></SfButton>
+                                    <SfButton Disabled="@(!string.IsNullOrEmpty(theme.StudentCode))" CssClass="btn btn-primary" IconCss="e-icons e-edit" OnClick="@(()=>EditTheme(theme.Id))" Title="Szerkesztés"></SfButton>
+                                    
+                                    <SfButton CssClass="btn btn-primary" IconCss="e-icons e-trash" OnClick="@(() => DeleteItem(theme.Id))" Title="Törlés"></SfButton>
+                                }
+                           
+                            </Template>
+                        </GridColumn>
+                        <GridColumn HeaderText="Véleményezett" Width="100" AllowFiltering="false">
+                            <Template>
+                                @{
+                                    var theme = (context as ThemeDto);
+                                    <td>@(theme.NumberOfFeedback) / @(theme.NumberOfProgrammes)</td>
+                                    @if (theme.IsRejected)
+                                    {
+                                        <td>
+                                            <SfTooltip Target="#reject" Content="Legalább egy szakon elutasítva!">
+                                                <SfIcon id="reject" Name="IconName.ErrorTreeview" Size="IconSize.Large" style="color: #ff0000;"></SfIcon>
+                                            </SfTooltip>
+                                        </td>
+                                    }
+                                }
+                            </Template>
+                        </GridColumn>
+                    </GridColumns>
+                </SfGrid>
+            </div>
+        </div>
+    }
+</LoadingScreen>
+
+
+
+@code {
+    // 2 helyről jöhet:
+    // 1. ha be van jeletkezve a felhasználó, akkor az aktív félév
+    // 2. localstorage
+    [Parameter]
+    [SupplyParameterFromQuery]
+    public int SemesterId { get; set; }
+
+    public List<ContextMenuItemModel> contextMenuItems = new List<ContextMenuItemModel>();
+
+    private List<Student> students;
+    public bool? success = null;
+    private int selectedThemeId;
+    private string selectedStudentCode;
+    private bool modalVisible = false;
+
+    private bool isInRole = false;
+    public bool isLoading = true;
+
+    public List<SemesterDto> nextSemesters = new List<SemesterDto>();
+    SfGrid<ThemeDto> Grid;
+    List<ThemeDto> SelectedRows = new List<ThemeDto>();
+    CopyThemeDto themeDto = new CopyThemeDto();
+
+    public bool IsLeftClick = false;
+    private bool firstLoading = true;
+    protected override async Task OnInitializedAsync()
+    {
+        await ThemeService.GetThemes();
+        await SemesterService.GetSemesters();
+        themeDto.FromSemester = (SemesterId != default) ? SemesterId : (SemesterService.Semesters.FirstOrDefault(s => s.IsActive)?.Id ?? default);
+        if (SemesterService.Semesters.Any(s => s.IsActive))
+        {
+            nextSemesters = SemesterService.Semesters.Where(s => s.StartDate >= SemesterService.Semesters.First(s => s.IsActive).StartDate).OrderBy(s => s.StartDate).ToList();
+        }
+
+        contextMenuItems = new List<ContextMenuItemModel>() {
+            new ContextMenuItemModel { Text = "Megtekintés", Target = ".e-content", Id = "ShowTheme" },
+            new ContextMenuItemModel { Text = "Szerkesztés", Target = ".e-content", Id = "EditTheme" },
+            new ContextMenuItemModel { Text = "Aktiválás", Target = ".e-content", Id = "Activate" },
+            new ContextMenuItemModel { Text = "Inaktiválás", Target = ".e-content", Id = "Inactivate" },
+            new ContextMenuItemModel { Text = "Hallgató hozzárendelése", Target = ".e-content", Id = "AssignStudent" },
+            new ContextMenuItemModel { Text = "Hallgató törlése", Target = ".e-content", Id = "RemoveStudent" },
+            new ContextMenuItemModel { Text = "Törlés", Target = ".e-content", Id = "DeleteItem" }
+        };
+        if (await UserIsInRole(Roles.HeadOfDepartment))
+        {
+            isInRole = true;
+        }
+        isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && firstLoading)
+        {
+            var state = await ReadFromLocalStorage<string>("params");
+            var semester = await ReadFromLocalStorage<string>("semester");
+            if (!string.IsNullOrWhiteSpace(state))
+            {
+                await Grid.SetPersistDataAsync(state);
+            }
+            if (!string.IsNullOrWhiteSpace(semester))
+            {
+                try
+                {
+                    themeDto.FromSemester = int.Parse(semester);
+                }
+                catch (Exception) { }
+            }
+            StateHasChanged();
+            await Grid.CallStateHasChangedAsync();
+            firstLoading = false;
+        }
+    }
+
+    async void IDisposable.Dispose()
+    {
+        await WriteToLocalStorage("params", await Grid.GetPersistData());
+        await WriteToLocalStorage("semester", themeDto.FromSemester.ToString());
+    }
+
+    public async Task ActionCompletedHandler(ActionEventArgs<ThemeDto> args)
+    {
+        if (args.RequestType == Syncfusion.Blazor.Grids.Action.Sorting ||
+            args.RequestType == Syncfusion.Blazor.Grids.Action.Filtering ||
+            args.RequestType == Syncfusion.Blazor.Grids.Action.Grouping)
+        {
+            await WriteToLocalStorage("params", await Grid.GetPersistData());
+            await WriteToLocalStorage("semester", themeDto.FromSemester.ToString());
+        }
+    }
+    #region Selection
+    public async Task GetSelectedRecords()
+    {
+        if (IsLeftClick)
+        {
+            SelectedRows = await this.Grid.GetSelectedRecordsAsync();
+            StateHasChanged();
+        }
+    }
+    public async Task DeselectHandler(RowDeselectEventArgs<ThemeDto> args)
+    {
+        await GetSelectedRecords();
+    }
+    public async Task SelectHandler(RowSelectEventArgs<ThemeDto> args)
+    {
+        await GetSelectedRecords();
+    }
+    async Task OnSelectAll(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        var selected = int.Parse(e.Value.ToString());
+        SemesterId = selected;
+        themeDto.FromSemester = selected;
+        ReloadPage($"?semesterId={selected}", false, true);
+        await ThemeService.GetThemes(themeDto.FromSemester.ToString());
+        await this.Grid.ClearFilteringAsync();
+        await this.Grid.ClearSortingAsync();
+        await this.Grid.ClearSelectionAsync();
+    }
+    void OnSelect(Microsoft.AspNetCore.Components.ChangeEventArgs e)
+    {
+        themeDto.ToSemester = int.Parse(e.Value.ToString());
+    }
+    async Task CopyThemesToSemester()
+    {
+        themeDto.Themes = SelectedRows.Select(sr => sr.Id).ToArray();
+        var result = await ThemeService.CopyTheme(themeDto);
+        if (result != null)
+        {
+            if (result.Success)
+            {
+                ShowToast(Messages.SuccessEdit, "Sikeres másolás", ToastType.Success);
+                ReloadPage();
+                isLoading = false;
+            }
+            else
+            {
+                ShowToast(Messages.FailedEdit, result.Message ?? "Sikertelen másolás", ToastType.Warning);
+            }
+        }
+        else
+        {
+            ShowToast(Messages.Error, Messages.RequestFailed, ToastType.Danger);
+        }
+        isLoading = false;
+    }
+    async Task HandleMouseDown(MouseEventArgs args)
+    {
+        if (args.Button == 2)
+        {
+            IsLeftClick = false;
+            await this.Grid.ClearSelectionAsync();
+        }
+        else if (args.Button == 0)
+        {
+            IsLeftClick = true;
+        }
+    }
+    #endregion
+    #region ContextMenu
+    public void ContextMenuOpened(ContextMenuOpenEventArgs<ThemeDto> args)
+    {
+        var theme = args.RowInfo.RowData;
+
+        foreach (var menuItem in args.ContextMenuObj.Items)
+        {
+            menuItem.Disabled = false;
+        }
+
+        if (theme.StatusName.Equals("Aktív"))
+        {
+            args.ContextMenuObj.Items[2].Disabled = true;
+        }
+        else
+        {
+            args.ContextMenuObj.Items[3].Disabled = true;
+        }
+        if (theme.NumberOfApproved == 0)
+        {
+            args.ContextMenuObj.Items[4].Disabled = true;
+            args.ContextMenuObj.Items[5].Disabled = true;
+        }
+        if (!string.IsNullOrEmpty(theme.StudentCode))
+        {
+            args.ContextMenuObj.Items[1].Disabled = true;
+            args.ContextMenuObj.Items[6].Disabled = true;
+        }
+        else
+        {
+            args.ContextMenuObj.Items[5].Disabled = true;
+        }
+    }
+
+    public async Task OnContextMenuClick(ContextMenuClickEventArgs<ThemeDto> args)
+    {
+        var theme = args.RowInfo.RowData;
+        if (theme == null)
+        {
+            return;
+        }
+        switch (args.Item.Id)
+        {
+            case "ShowTheme":
+                ShowTheme(theme.Id);
+                break;
+            case "EditTheme":
+                EditTheme(theme.Id);
+                break;
+            case "Activate":
+                await ActivateTheme(theme.Id);
+                break;
+            case "Inactivate":
+                await InactivateTheme(theme.Id);
+                break;
+            case "AssignStudent":
+                NavigateTo("/assignstudent/" + theme.Id);
+                break;
+            case "RemoveStudent":
+                await LoadModal(theme.Id);
+                //RemoveStudent();
+                break;
+            case "DeleteItem":
+                await DeleteItem(theme.Id);
+                break;
+        }
+    }
+    #endregion
+    #region Functions
+    private async Task ActivateTheme(int id)
+    {
+        await ThemeService.ActivateTheme(id);
+        if (ThemeService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.FailedEdit, ThemeService.ErrorMessage, ToastType.Warning);
+            return;
+        }
+        else
+        {
+            ShowToast(Messages.SuccessEdit, "A téma aktiválva lett", ToastType.Success);
+        }
+        ReloadPage();
+        isLoading = false;
+    }
+
+    private async Task InactivateTheme(int id)
+    {
+        await ThemeService.InactivateTheme(id);
+        if (ThemeService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.FailedEdit, ThemeService.ErrorMessage, ToastType.Warning);
+            return;
+        }
+        else
+        {
+            ShowToast(Messages.SuccessEdit, "A téma inaktiválva lett", ToastType.Success);
+        }
+        ReloadPage();
+        isLoading = false;
+    }
+
+    private void ShowTheme(int themeId)
+    {
+        NavigateTo($"/theme/{themeId}?returnUrl=themes?semesterId={themeDto.FromSemester}");
+        isLoading = false;
+    }
+
+    private void EditTheme(int themeId)
+    {
+        NavigateTo($"/edittheme/{themeId}?returnUrl=themes?semesterId={themeDto.FromSemester}");
+        isLoading = false;
+    }
+
+    private async Task DeleteItem(int id)
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Biztosan törölni szeretné a témát?");
+        if (confirmed)
+        {
+            var result = await ThemeService.DeleteTheme(id);
+            if (result != null)
+            {
+                if (!result.Success)
+                {
+                    ShowToast(Messages.FailedDelete, result.Message ?? "A Témát nem sikerült törölni", ToastType.Warning);
+                }
+                else
+                {
+                    ShowToast(Messages.SuccessDelete, "Téma sikeresen törölve", ToastType.Success);
+                    ReloadPage();
+                    isLoading = false;
+                }
+            }
+            else
+            {
+                ShowToast(Messages.Error, Messages.RequestFailed, ToastType.Danger);
+            }
+        }
+        isLoading = false;
+    }
+
+    private async Task LoadModal(int themeId)
+    {
+        var themeForAssignStudentDto = await ThemeService.GetThemeForAssignStudent(themeId.ToString());
+        if (ThemeService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.FailedEdit, ThemeService.ErrorMessage, ToastType.Warning);
+            return;
+        }
+        students = themeForAssignStudentDto.Students.ToList();
+        selectedThemeId = themeId;
+        modalVisible = true;
+    }
+   
+    private async Task RemoveStudent()
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Biztosan törölni szeretné a hallgatót a témáról?");
+        if (confirmed)
+        {
+            var result = await ThemeService.RemoveStudent(new RemoveStudentDto { ThemeId = selectedThemeId, StudentCode = selectedStudentCode });
+            if (result.Success)
+            {
+                ReloadPage();
+                isLoading = false;
+            }
+            else
+            {
+                await JsRuntime.InvokeVoidAsync("alert", result.Message);
+            }
+        }
+    }
+  
+    #endregion
+    #region Export
+    public async Task ToolbarClickHandler(Syncfusion.Blazor.Navigations.ClickEventArgs args)
+    {
+        if (args.Item.Id == "ExcelExport")
+        {
+            Grid.AllowExcelExport = true;
+            await this.Grid.ExcelExport(new ExcelExportProperties
+                {
+                    DataSource = (List<ThemeDto>)await Grid.GetFilteredRecordsAsync()
+                });
+            ShowToast("Sikeres Letöltés", string.Empty, ToastType.Success);
+        }
+    }
+    #endregion
+}

@@ -1,0 +1,30 @@
+﻿@using Syncfusion.Blazor.Buttons
+@inject NavigationManager NavigationManager
+@inject ILocalStorageService LocalStorage
+@inject AuthenticationStateProvider AuthStateProvider
+
+<AuthorizeView>
+    <Authorized>
+        <SfIcon IconCss="fa-solid fa-arrow-right-from-bracket btn btn-danger" style="margin-right: 10px" @onclick="Logout"></SfIcon>
+    </Authorized>
+
+    <NotAuthorized>
+        <button @onclick="Login" class="btn btn-primary">Bejelentkezés</button>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    void Login()
+    {
+        NavigationManager.NavigateTo("login");
+    }
+
+    async Task Logout()
+    {
+        await LocalStorage.RemoveItemAsync("authToken");
+        await LocalStorage.RemoveItemAsync("params");
+        await LocalStorage.RemoveItemAsync("semester");
+        await AuthStateProvider.GetAuthenticationStateAsync();
+        NavigationManager.NavigateTo("login");
+    }
+}

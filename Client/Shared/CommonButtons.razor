@@ -1,0 +1,15 @@
+﻿
+@inject IJSRuntime jsRuntime
+
+<div class="btn-toolbar" role="toolbar">
+    <div class="btn-group" style="margin-right: 4px;" role="group">
+        <button type="submit" class="btn btn-primary">Mentés</button>
+    </div>
+    <div class="btn-group" role="group">
+        <GoBack Uri="@GoBackUri"></GoBack>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string GoBackUri { get; set; } = "/";
+}

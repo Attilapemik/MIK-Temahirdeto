@@ -1,0 +1,34 @@
+﻿<ExceptionHandler>
+    <CascadingAuthenticationState>
+        <Router AppAssembly="@typeof(App).Assembly">
+            <Found Context="routeData">
+                <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                    <NotAuthorized>
+                        <LoginRedirect />
+                    </NotAuthorized>
+                </AuthorizeRouteView>
+                <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+            </Found>
+            <NotFound>
+                <PageTitle>Az oldal nem található</PageTitle>
+                <LayoutView Layout="@typeof(MainLayout)">
+                    <style>
+                        .content {
+                            padding-top: 0px;
+                        }
+                    </style>
+                    <div class="d-flex align-items-center justify-content-center" style="height: 100vh">
+                        <div class="text-center">
+                            <h1 class="display-1 fw-bold">404</h1>
+                            <p class="fs-3"> Az oldal nem található</p>
+                            <p class="lead">
+                                Az oldal amit keres nem található
+                            </p>
+                            <a href="/" class="btn btn-primary">Vissza a meghirdetett témákra</a>
+                        </div>
+                    </div>
+                </LayoutView>
+            </NotFound>
+        </Router>
+    </CascadingAuthenticationState>
+</ExceptionHandler>

@@ -1,0 +1,75 @@
+﻿@inject IJSRuntime jsRuntime
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IToastService Toast
+
+@code {
+    string elementToFocusClass = ".focusable";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Focus();
+        }
+    }
+
+    private async Task Focus()
+    {
+        await jsRuntime.InvokeVoidAsync("focusInput", elementToFocusClass);
+    }
+
+    protected void ReloadPage(string parameters = "", bool forceLoad = true, bool replace = false)
+    {
+        var uri = NavigationManager.Uri.IndexOfAny(new char[] { '?' }) > -1 ? 
+            NavigationManager.Uri.Substring(0, NavigationManager.Uri.IndexOf("?")) :
+            NavigationManager.Uri;
+        NavigationManager.NavigateTo($"{uri}{parameters}", forceLoad: forceLoad, replace: replace);
+    }
+
+    protected void NavigateTo(string uri)
+    {
+        NavigationManager.NavigateTo(uri);
+    }
+
+    protected void NavigateBack(string back = "/")
+    {
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("returnUrl", out var url))
+        {
+            back = $"/{url}";
+        }
+        NavigationManager.NavigateTo(back);
+    }
+
+    protected async Task<bool> UserIsInRole(string role)
+    {
+        var authenticationState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userRole = authenticationState.User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? null;
+        return userRole?.Equals(role) ?? false;
+    }
+
+    protected async Task<bool> UserIsInRole(string[] roles)
+    {
+        var authenticationState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var userRole = authenticationState.User.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? null;
+        return roles.Any(r => userRole?.Equals(r) ?? false);
+    }
+
+    protected void ShowToast(string title, string message, ToastType type)
+    {
+        Toast.ShowToast(title, message, type);
+    }
+
+    protected async Task WriteToLocalStorage<T>(string key, T text) where T : class
+    {
+        await jsRuntime.InvokeVoidAsync("localStorage.setItem", key, text);
+    }
+
+    protected async Task<T> ReadFromLocalStorage<T>(string key) where T : class
+    {
+        var data = await jsRuntime.InvokeAsync<T>("localStorage.getItem", key);
+        await jsRuntime.InvokeVoidAsync("localStorage.removeItem", key);
+        return data;
+    }
+}

@@ -1,0 +1,27 @@
+﻿@using PannonBlazor.Client.Services.ComponentServices.Toast;
+
+<div class="toast show @ToastSettings.BackgroundCssClass @ToastSettings.TextCssClass" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="toast-header @ToastSettings.BackgroundCssClass @ToastSettings.TextCssClass">
+        <strong class="me-auto">@ToastSettings.Title</strong>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+    <div class="toast-body">
+        <p>@ToastSettings.Message</p>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    private Toasts Toasts { get; set; }
+
+    [Parameter]
+    public Guid ToastId { get; set; }
+
+    [Parameter]
+    public ToastSettings ToastSettings { get; set; }
+
+    private void Close()
+    {
+        Toasts.RemoveToast(ToastId);
+    }
+}

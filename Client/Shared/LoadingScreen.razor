@@ -1,0 +1,28 @@
+﻿@*https://www.meziantou.net/creating-a-reusable-loading-indicator-in-blazor.htm*@
+@if (IsLoading)
+{
+    <div class="loading-indicator" style="position:absolute;top: 48vh;width: max-content;left: 50%; text-align:center;transform: translate(-50%, -50%);">
+        <div style="display:flex; gap:10px; justify-content:center; align-items:center">
+            <div class="spinner-border" role="status" style="width: 10rem; height: 10rem;"></div>
+        </div>
+    </div>
+}
+else
+{
+    @ChildContent
+}
+
+@code {
+    [Parameter]
+    public bool IsLoading { get; set; }
+
+    [Parameter]
+    public RenderFragment ChildContent { get; set; }
+    protected override void OnParametersSet()
+    {
+        if (!IsLoading)
+        {
+            IsLoading = false;
+        }
+    }
+}

@@ -1,0 +1,102 @@
+﻿@inherits CommonComponentBase
+@page "/instructors"
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject IInstructorService InstructorService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Felhasználók</PageTitle>
+
+<LoadingScreen IsLoading="@isLoading">
+    <div class="container">
+        @if (InstructorService.Instructors.Count == 0)
+        {
+            <div class="row">
+                <div class="col-6"><h2>Nem találhatók Felhasználók a rendszerben</h2></div>
+                <div class="col-6">
+                    <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/register?returnUrl=instructors")'>Új felhasználó</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-6"><h2>Felhasználók</h2></div>
+                <div class="col-6">
+                    <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/register?returnUrl=instructors")'>Új felhasználó</button>
+                </div>
+            </div>
+            <br />
+            <div>
+                <SfGrid ID="Grid" @ref="UsersGrid" DataSource="@InstructorService.Instructors" AllowSorting AllowPaging
+                            AllowTextWrap AllowExcelExport Toolbar="@(new List<string>() { "ExcelExport","Search" })">
+                <GridEvents OnToolbarClick="ToolbarExportClickHandler" TValue="UserGetDto"></GridEvents>
+                <GridColumns>
+                    <GridColumn Field=@nameof(UserGetDto.Username) HeaderText="Felhasználónév" />
+                    <GridColumn Field=@nameof(UserGetDto.NeptunCode) HeaderText="Neptunkód" />
+                    <GridColumn Field=@nameof(UserGetDto.Email) HeaderText="Email" />
+                    <GridColumn Field=@nameof(UserGetDto.DepartmentName) HeaderText="Tanszék" />
+                    <GridColumn Field=@nameof(UserGetDto.GetRolesString) HeaderText="Szerepkör(ök)" />
+                    <GridColumn>
+                        <Template>
+                            @{
+                                    var instructor = context as UserGetDto;
+                                    <button type="button" class="btn btn-primary" @onclick="(() => EditUser(instructor.Id))">Szerkeszt</button>
+                                    <button type="button" class="btn btn-danger" @onclick="(() => DeleteUser(instructor.Id))">Törlés</button>
+                                }
+                            </Template>
+                        </GridColumn>
+                    </GridColumns>
+                </SfGrid>
+            </div>
+        }
+    </div>
+</LoadingScreen>
+
+@code {
+    public bool isLoading = true;
+
+    private SfGrid<UserGetDto> UsersGrid;
+    protected override async Task OnInitializedAsync()
+    {
+        await InstructorService.GetInstructors();
+        if (InstructorService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, InstructorService.ErrorMessage, ToastType.Danger);
+        }
+        isLoading = false;
+    }
+
+    public async Task ToolbarExportClickHandler(Syncfusion.Blazor.Navigations.ClickEventArgs args)
+    {
+        if (args.Item.Id == "Grid_excelexport") //Id is combination of Grid's ID and itemname
+        {
+            await this.UsersGrid.ExcelExport();
+            ShowToast("Sikeres Letöltés", string.Empty, ToastType.Success);
+        }
+        isLoading = false;
+    }
+
+    private void EditUser(int userId)
+    {
+        NavigateTo($"/edituser/{userId}?returnUrl=instructors");
+        isLoading = false;
+    }
+
+    private async void DeleteUser(int userId)
+    {
+        if (!await JSRuntime.InvokeAsync<bool>("confirm", $"Biztosan törölni szeretnéd a felhasználót?"))
+            return;
+        await InstructorService.DeleteUser("" + userId);
+        if (InstructorService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.FailedEdit, InstructorService.ErrorMessage, ToastType.Warning);
+            return;
+        }
+        else
+        {
+            ShowToast(Messages.SuccessEdit, "A felhasználó sikeresen törölve lett", ToastType.Success);
+        }
+        ReloadPage();
+        isLoading = false;
+    }
+}

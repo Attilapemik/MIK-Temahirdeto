@@ -1,0 +1,56 @@
+﻿@inherits CommonComponentBase
+@page "/allthemes"
+@using Syncfusion.Blazor.Inputs
+@using Syncfusion.Blazor.Grids
+@using Syncfusion.Blazor.Navigations
+@attribute [Authorize]
+@inject IThemeService ThemeService
+
+<PageTitle>Témák</PageTitle>
+
+<LoadingScreen IsLoading="@isLoading">
+    @if (ThemeService.Themes.Count == 0)
+    {
+        <div class="container">
+            <div class="row">
+                <h2>Nem rögzítettek még Témát</h2>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="container">
+            <div class="row">
+                <h2>Összes téma</h2>
+            </div>
+            <br />
+            <div>
+                <SfGrid ID="Grid" DataSource="@ThemeService.Themes"
+                    AllowSorting="true" AllowPaging="true" AllowFiltering="true" AllowTextWrap="true">
+                    <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel"></GridFilterSettings>
+
+                    <GridColumns>
+                        <GridColumn Field=@nameof(ThemeDto.Title) HeaderText="Cím" Width="40%"></GridColumn>
+                        <GridColumn Field=@nameof(ThemeDto.Instructor) HeaderText="Témavezető" Width="20%"></GridColumn>
+                        <GridColumn Field=@nameof(ThemeDto.CreatedAt) HeaderText="Meghirdetés dátuma" Width="20%"></GridColumn>
+                        <GridColumn Field=@nameof(ThemeDto.SemesterName) HeaderText="Időszak" Width="20%"></GridColumn>
+                    </GridColumns>
+                </SfGrid>
+            </div>
+        </div>
+    }
+</LoadingScreen>
+
+@code {
+    public bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ThemeService.GetThemes();
+        if (ThemeService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, ThemeService.ErrorMessage, ToastType.Danger);
+        }
+        isLoading = false;
+    }
+}

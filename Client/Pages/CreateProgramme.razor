@@ -1,0 +1,72 @@
+﻿@inherits CommonComponentBase
+@page "/createprogramme"
+@using Syncfusion.Blazor.Inputs
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject IProgrammeService ProgrammeService
+
+<PageTitle>Szak létrehozása</PageTitle>
+<HeadContent>
+    <style>
+        .form-check .form-check-input {
+            float: left;
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+
+        .form-switch .form-check-input {
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
+        }
+    </style>
+</HeadContent>
+<div class="container">
+    <h2>Szak létrehozása</h2>
+    <EditForm Model="programme" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        <div>
+            <label for="programme">Név: </label>
+            <InputText id="programme" @bind-Value="programme.Name" class="form-control focusable" />
+            <ValidationMessage For="@(() => programme.Name)" />
+            <label for="programmecolor">Szín: </label>
+            <br />
+            <SfColorPicker id="programmecolor" ValueChange="Valtozas" @bind-Value="programme.Color" ModeSwitcher="false"
+                           CssClass="focusable" />
+            <ValidationMessage For="@(() => programme.Color)" />
+            <br />
+            <label for="programmetype">Képzés szintje: </label>
+            <div class="d-flex">
+                <label class="form-check-label">BSc</label>
+                <div class="form-switch form-check ms-2">
+                    <InputCheckbox id="programmetype" @bind-Value="@isMSc" class="form-check-input form-control" />
+                </div>
+                <label class="form-check-label">MSc</label>
+            </div>
+        </div>
+        <br />
+        <CommonButtons GoBackUri="/programmes"></CommonButtons>
+    </EditForm>
+</div>
+
+@code {
+
+    ProgrammeCreateDto programme = new ProgrammeCreateDto();
+    private bool isMSc = false;
+
+    async void HandleSubmit()
+    {
+        programme.ProgrammeType = isMSc ? ProgrammeType.MSc : ProgrammeType.BSc;
+        await ProgrammeService.CreateProgramme(programme);
+        if (ProgrammeService.ErrorMessage is null)
+        {
+            ShowToast(Messages.SuccessCreate, "Szak Hozzáadva", ToastType.Success);
+            NavigateBack();
+        }
+        else
+        {
+            ShowToast(Messages.FailedCreate, ProgrammeService.ErrorMessage ?? "Szak hozzáadása sikertelen", ToastType.Warning);
+        }
+    }
+    public void Valtozas(ColorPickerEventArgs e)
+    {
+        programme.Color = e.CurrentValue.Hex;
+    }
+}

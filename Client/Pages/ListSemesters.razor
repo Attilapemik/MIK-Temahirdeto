@@ -1,0 +1,197 @@
+﻿@inherits CommonComponentBase
+@page "/semesters"
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject ISemesterService<SemesterDto> SemesterService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Félévek</PageTitle>
+<LoadingScreen IsLoading="@isLoading">
+    @if (SemesterService.Semesters.Count == 0)
+    {
+        <div class="container">
+            <div class="row">
+                <div class="col-6">
+                    <h2>Nem rögzítettek még Félévet</h2>
+                </div>
+                <div class="col-6">
+                    <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/createsemester?returnUrl=semesters")'>Új időszak</button>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="container">
+            <div class="row">
+                <div class="col-6">
+                    <h2>Félévek</h2>
+                </div>
+                <div class="col-6">
+                    <button type="button" class="btn btn-info" style="float: right;" @onclick='() => NavigateTo("/createsemester?returnUrl=semesters")'>Új időszak</button>
+                </div>
+            </div>
+            <div>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Félév megnevezése</th>
+                            <th>Oktatók</th>
+                            <th>Hallgatók</th>
+                            <th>Aktív félév</th>
+                            <th></th>
+                            <th>Törlés</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var semester in SemesterService.Semesters)
+                        {
+                            <tr>
+                                <td class="align-middle">@semester.Name</td>
+                                <td class="align-middle">
+                                    <div class="form-check form-switch">
+                                        <input id="@($"icb{semester.Id}")" type="checkbox" class="form-check-input" checked=@semester.IsVisibleInstructor @onchange="eventArgs => { InstructorClicked(semester.Id, eventArgs); }" />
+                                    </div>
+                                </td>
+                                <td class="align-middle">
+                                    <div class="form-check form-switch">
+                                        <input id="@($"scb{semester.Id}")" type="checkbox" class="form-check-input" checked=@semester.IsVisibleStudent @onchange="eventArgs => { StudentClicked(semester.Id, eventArgs); }" />
+                                    </div>
+                                </td>
+                                <td class="align-middle">
+                                    @if (semester.IsActive)
+                                    {// [JAVITANI] ennek kéne egy jobb design ötlet
+                                        <span class="badge rounded-pill text-uppercase" style="background-color: seagreen;">Aktív</span>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn btn-success" @onclick="(() => ActivateSemester(semester.Id))">Aktiválás</button>
+                                    }
+
+                                </td>
+                                <td class="align-middle"><button type="button" class="btn btn-primary" @onclick="(() => EditSemester(semester.Id))">Szerkeszt</button></td>
+                                @if (semester.ThemeProgrammesCount == 0)
+                                {
+                                    <td class="align-middle"><button type="button" class="btn btn-danger" @onclick="(() => DeleteSemester(semester.Id))">Törlés</button></td>
+                                }
+                                else
+                                {
+                                    <td class="align-middle">
+                                        <span>A félévhez már tartozik téma</span>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</LoadingScreen>
+
+@code {
+    public bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SemesterService.GetSemesters();
+        if (SemesterService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.Error, SemesterService.ErrorMessage, ToastType.Danger);
+        }
+        isLoading = false;
+    }
+
+    async void InstructorClicked(int semesterId, ChangeEventArgs e)
+    {
+        // [JAVITANI] ha nem élérhető az aktív félév az oktatóknak akkor a /themes-nél nincs semmi. 
+        // Át kéne vinni a semestert paraméterbe (1. opció)
+        bool cbValue = (bool)e.Value!;
+        if (cbValue)
+        {
+            await SemesterService.AllowInstructor(semesterId);
+        }
+        else
+        {
+            await SemesterService.DenyInstructor(semesterId);
+        }
+
+        if (SemesterService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.FailedEdit, SemesterService.ErrorMessage, ToastType.Warning);
+            var checkbox = $"input[type='checkbox'][id='icb{semesterId}']";
+            var js = $"document.querySelector(\"{checkbox}\").checked = {(!cbValue).ToString().ToLower()};";
+            await JSRuntime.InvokeVoidAsync("eval", js);
+        }
+        else
+        {
+            ShowToast(Messages.SuccessEdit, $"A félév mostantól {(cbValue ? "látható" : "láthatatlan")} az oktatóknak", ToastType.Success);
+        }
+        isLoading = false;
+    }
+
+    async void StudentClicked(int semesterId, ChangeEventArgs e)
+    {
+        bool cbValue = (bool)e.Value!;
+        if (cbValue)
+        {
+            await SemesterService.AllowStudent(semesterId);
+        }
+        else
+        {
+            await SemesterService.DenyStudent(semesterId);
+        }
+
+        if (SemesterService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.FailedEdit, SemesterService.ErrorMessage, ToastType.Warning);
+            var checkbox = $"input[type='checkbox'][id='scb{semesterId}']";
+            var js = $"document.querySelector(\"{checkbox}\").checked = {(!cbValue).ToString().ToLower()};";
+            await JSRuntime.InvokeVoidAsync("eval", js);
+        }
+        else
+        {
+            ShowToast(Messages.SuccessEdit, $"A félév mostantól {(cbValue ? "látható" : "láthatatlan")} az hallgatóknak", ToastType.Success);
+        }
+        isLoading = false;
+    }
+
+    void ActivateSemester(int semesterId)
+    {
+        SemesterService.ActivateSemester(semesterId);
+        if (SemesterService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.FailedEdit, SemesterService.ErrorMessage, ToastType.Warning);
+            isLoading = false;
+            return;
+        }
+        else
+        {
+            ShowToast(Messages.SuccessEdit, "A félév aktiválva lett", ToastType.Success);
+        }
+        ReloadPage();
+        isLoading = false;
+    }
+
+    private void EditSemester(int semesterId)
+    {
+        NavigateTo($"/editsemester/{semesterId}?returnUrl=semesters");
+        isLoading = false;
+    }
+
+    private void DeleteSemester(int semesterId)
+    {
+        SemesterService.DeleteSemester("" + semesterId);
+        if (SemesterService.ErrorMessage is not null)
+        {
+            ShowToast(Messages.FailedEdit, SemesterService.ErrorMessage, ToastType.Warning);
+            isLoading = false;
+            return;
+        }
+        else
+        {
+            ShowToast(Messages.SuccessEdit, "A félév sikeresen törölve lett", ToastType.Success);
+        }
+        ReloadPage();
+        isLoading = false;
+    }
+}

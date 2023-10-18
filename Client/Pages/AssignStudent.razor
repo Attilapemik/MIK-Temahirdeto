@@ -1,0 +1,102 @@
+﻿@inherits CommonComponentBase
+@page "/assignstudent/{themeid}"
+@attribute [Authorize]
+@inject IProgrammeService ProgrammeService
+@inject IThemeService ThemeService
+
+<PageTitle>Hallgató témához rendelése</PageTitle>
+<LoadingScreen IsLoading="@isLoading">
+    <div class="container">
+        <h2>Hallgató témához rendelése</h2>
+        <h5>Téma: @assignDto.Title</h5>
+        <EditForm Model="assignDto" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <div>
+                <label for="student">Hallgató neve: </label>
+                <InputText id="student" @bind-Value="assignDto.Student" class="form-control focusable" />
+                <ValidationMessage For="@(() => assignDto.Student)" />
+            </div>
+            <div>
+                <label for="studentcode">Hallgató neptunkódja: </label>
+                <InputText id="studentcode" @bind-Value="assignDto.StudentCode" class="form-control" />
+                <ValidationMessage For="@(() => assignDto.StudentCode)" />
+            </div>
+            <div>
+                <label for="studentprogramme">Hallgató szak:</label>
+                <InputSelect id="studentprogramme" @bind-Value="SelectedProgramme" class="form-control">
+                    @foreach (var p in assignDto.ThemeProgrammes)
+                    {
+                        <option value="@p.Id">@p.Name</option>
+                    }
+                </InputSelect>
+            </div>
+            @if (assignDto.Students != null && assignDto.Students.Any())
+            {
+                <div>
+                    <label for="addedstudents">Eddig hozzáadott hallgatók:</label>
+                    <input id="addedstudents" class="form-control" disabled value="@String.Join(", ", assignDto.Students.Select(s => $"{s.StudentName} ({s.NeptunCode})"))">
+                </div>
+            }
+            <br />
+            <CommonButtons GoBackUri="/themes"></CommonButtons>
+        </EditForm>
+    </div>
+</LoadingScreen>
+
+@code {
+    [Parameter]
+    public string themeid { get; set; }
+
+    public bool isLoading = true;
+    private int SelectedProgramme = default;
+
+    ThemeForAssignStudentDto assignDto = new ThemeForAssignStudentDto();
+
+    protected override async Task OnInitializedAsync()
+    {
+        assignDto = await ThemeService.GetThemeForAssignStudent(themeid);
+        if (assignDto is null)
+        {
+            ShowToast(Messages.Error, ThemeService.ErrorMessage ?? Messages.LoadFailed, ToastType.Danger);
+            NavigateBack();
+            return;
+        }
+        SelectedProgramme = assignDto.StudentProgrammeId;
+        isLoading = false;
+    }
+
+    async Task HandleSubmit()
+    {
+        if (SelectedProgramme == default)
+        {
+            ShowToast(Messages.Warning, "Kötelező kiválasztani a szakot", ToastType.Warning);
+            return;
+        }
+
+        var assignStudentDto = new AssignStudentDto
+            {
+                Student = assignDto.Student,
+                StudentCode = assignDto.StudentCode,
+                StudentProgrammeId = SelectedProgramme,
+                ThemeId = int.Parse(themeid)
+            };
+
+        var result = await ThemeService.AssignStudent(assignStudentDto);
+        if (result is not null)
+        {
+            if (result.Success)
+            {
+                ShowToast("Sikeres hozzárendelés", result.Message!, ToastType.Success);
+                NavigateBack();
+            }
+            else
+            {
+                ShowToast(Messages.FailedEdit, result.Message!, ToastType.Warning);
+            }
+        }
+        else
+        {
+            ShowToast(Messages.Error, Messages.UploadFailed, ToastType.Danger);
+        }
+    }
+}

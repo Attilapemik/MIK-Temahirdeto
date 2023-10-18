@@ -1,0 +1,195 @@
+﻿@page "/"
+@inject IThemeService ThemeService
+@inject ISemesterService<SemesterGetDto> SemesterService
+@inject IProgrammeService ProgrammeService
+@inject NavigationManager navigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JS
+@using Syncfusion.Blazor.Buttons
+@using Syncfusion.Blazor.Cards
+@using Syncfusion.Blazor.DropDowns
+@using Syncfusion.Blazor.Grids
+@using System.Security.Claims
+
+<PageTitle>Meghirdetett témák</PageTitle>
+<HeadContent>
+    <link href="/tailwindcss/tailwind.min.css" rel="stylesheet">
+    <style>
+        * {
+            text-overflow: clip !important;
+            overflow: initial !important;
+            white-space: normal !important;
+        }
+
+        .e-gridheader {
+            height: 4rem !important;
+        }
+
+        .PannonBTN {
+            background-color: rgb(90,60,90) !important;
+            border: none !important;
+        }
+        h2 {
+            font-size: x-large;
+            font-weight: 600;
+        }
+    </style>
+</HeadContent>
+<LoadingScreen IsLoading="@isLoading">
+<div class="container">
+    <div class="row">
+        @if (ThemeService.StudentThemes.Count > 0)
+        {
+            <div class="col">
+                <nav aria-label="Breadcrumb" class="flex">
+                    <ol role="list"
+                    class="flex overflow-hidden rounded-lg border border-gray-200 text-gray-600">
+                        <li class="flex items-center">
+                            <a href="/"
+                           class="flex h-10 items-center bg-gray-100 px-4 transition hover:text-gray-900">
+                                <i class="fa-solid fa-house"></i>
+                                <span class="ml-1.5 text-xs font-medium"> Témák </span>
+                            </a>
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            
+            <style>
+                @foreach (var item in ProgrammeService.Programmes)
+                {
+                    @(".color-"+item.Color.Replace("#","")+"{"+"background-color: "+item.Color+" !important;}")
+                }
+            </style>
+            <div class="col">
+                <label>Válassz szakot:</label>
+                <SfMultiSelect TItem="ProgrammeDto" TValue="string[]" DataSource="ProgrammeService.Programmes"
+                        Mode="@Syncfusion.Blazor.DropDowns.VisualMode.Box">
+                    <MultiSelectEvents TValue="string[]" TItem="ProgrammeDto" 
+                    OnChipTag="@OnTagging" OnValueRemove="@OnValueRemovehandler" OnValueSelect="@OnValueSelecthandler"
+                    Cleared="@Clearedhandler"/>
+                    <MultiSelectFieldSettings Value="Id" Text="Name"></MultiSelectFieldSettings>
+                </SfMultiSelect>
+            </div>
+        }
+        else if (ThemeService.ErrorMessage is not null)
+        {
+            <div class="col">
+                <h2>@ThemeService.ErrorMessage</h2>
+            </div>
+        }else if (ThemeService.StudentThemes.Count == 0)
+        {
+            <div class="col">
+                <h2>Témák betöltése...</h2>
+            </div>
+        }
+        <div class="col">
+            <AuthorizeView>
+                <NotAuthorized>
+                    <button style='float:right;' @onclick="NavigateToLogin" class="btn btn-primary PannonBTN">Oktatói bejelentkezés</button>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+
+    @if (ThemeService.StudentThemes.Count > 0)
+    {
+        <p>Aktív időszak: @activeSemester</p>
+        <SfGrid @ref="Grid" DataSource="@ThemeList" AllowSorting AllowFiltering AllowTextWrap>
+            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel"></GridFilterSettings>
+            <GridEvents CommandClicked="OnCommandClicked" TValue="StudentThemeListDto"></GridEvents>
+            <GridTextWrapSettings WrapMode="WrapMode.Content"></GridTextWrapSettings>
+
+            <GridColumns>
+                <GridColumn Field=@nameof(StudentThemeListDto.Title) HeaderText="Cím" Width="55%"></GridColumn>
+                <GridColumn Field=@nameof(StudentThemeListDto.InstructorName) Width="15%" HeaderText="Oktató/belső konzulens név"></GridColumn>
+                <GridColumn Field=@nameof(StudentThemeListDto.ThemeType) Width="10%" HeaderText="Típus"></GridColumn>
+                <GridColumn Field=@nameof(StudentThemeListDto.NeptunCode) HeaderText="Felvette" Width="10%"></GridColumn>
+                <GridColumn HeaderText="Megtekintés" TextAlign="TextAlign.Center" Width="10%">
+                    <GridCommandColumns>
+                        <GridCommandColumn ButtonOption="@(new CommandButtonOptions() { IconCss="e-icons e-eye", CssClass="PannonBTN", Content = "" })"></GridCommandColumn>
+                    </GridCommandColumns>
+                </GridColumn>
+            </GridColumns>
+        </SfGrid>
+    }
+</div>
+</LoadingScreen>
+@code {
+    public bool isLoading = true;
+    List<StudentThemeListDto> ThemeList = new List<StudentThemeListDto>();
+    List<ProgrammeDto> ProgrammeFilterList = new List<ProgrammeDto>();
+    SfGrid<StudentThemeListDto> Grid { get; set; }
+    string activeSemester;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        var isAuthenticated = state.User.Identity?.IsAuthenticated ?? false;
+        await SemesterService.GetActiveSemester();
+        if (isAuthenticated)
+        {
+            var role = state.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Role)?.Value ?? "N/A";
+            if (role == Roles.ProgrammeLeader)
+            {
+                navigationManager.NavigateTo("themesunderapproval");
+            }
+            else
+            {
+                navigationManager.NavigateTo($"themes?semesterId={SemesterService.Semester.Id}");
+            }
+            return;
+        }
+
+        await ThemeService.GetThemeProgrammesForStudents();
+        await ProgrammeService.GetProgrammes();
+
+        activeSemester = SemesterService.Semester is not null ? SemesterService.Semester.Name : "N/A";
+
+        ThemeList = ThemeService.StudentThemes;
+        isLoading = false;
+    }
+    #region Filtering
+    private void OnValueRemovehandler(RemoveEventArgs<ProgrammeDto> args)
+    {
+        ProgrammeFilterList.Remove(ProgrammeFilterList.First(x=>x.Id.Equals(args.ItemData.Id)));
+        ThemeFilter();
+    }
+    private void OnValueSelecthandler(SelectEventArgs<ProgrammeDto> args)
+    {
+        ProgrammeFilterList.Add(args.ItemData);
+        ThemeFilter();
+    }
+    private void Clearedhandler(MouseEventArgs args)
+    {
+        ProgrammeFilterList.Clear();
+        ThemeFilter();
+    }
+
+    private void ThemeFilter()
+    {
+        if (ProgrammeFilterList.Count == 0)
+        {
+            ThemeList = ThemeService.StudentThemes;
+        }
+        else
+        {
+            var list =  ThemeService.StudentThemes.Where(st => st.Programmes.Any(p => ProgrammeFilterList.Any(pfl => pfl.Id == p.Id))).ToList();
+            ThemeList = ProgrammeFilterList.Count == 0 ? ThemeService.StudentThemes : list;
+        }
+
+    }
+    private void OnTagging(Syncfusion.Blazor.DropDowns.TaggingEventArgs<ProgrammeDto> args)
+    {
+        args.SetClass = "color-"+args.ItemData.Color.Replace("#", "");
+    }
+    #endregion
+    public void OnCommandClicked(CommandClickEventArgs<StudentThemeListDto> args)
+    {
+        navigationManager.NavigateTo("/showtheme/" + args.RowData.Id);
+    }
+    public void NavigateToLogin()
+    {
+        navigationManager.NavigateTo("login");
+    }
+}

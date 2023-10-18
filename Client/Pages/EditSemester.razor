@@ -1,0 +1,71 @@
+﻿@inherits CommonComponentBase
+@page "/editsemester/{id}"
+@using Syncfusion.Blazor.Calendars
+@attribute [Authorize(Roles = Roles.Admin)]
+@inject ISemesterService<SemesterDto> SemesterService
+
+<PageTitle>Felhasználó szerkesztése</PageTitle>
+
+<LoadingScreen IsLoading="@isLoading">
+    <div class="container">
+        <h2>Időszak szerkesztése</h2>
+        <EditForm Model="semester" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+            <div>
+                <label for="semestername">Név: </label>
+                <InputText id="semestername" @bind-Value="semester.Name" class="form-control" autofocus />
+                <ValidationMessage For="@(() => semester.Name)" />
+                <label for="semesterdates">Időszak: </label>
+                <SfDateRangePicker id="semesterdates" class="form-control" autofocus StartDate="semester.StartDate" EndDate="semester.EndDate">
+                    <DateRangePickerEvents TValue="DateTime" ValueChange="@onChange"></DateRangePickerEvents>
+                </SfDateRangePicker>
+            </div>
+            <br />
+            <CommonButtons GoBackUri="/semesters"></CommonButtons>
+        </EditForm>
+    </div>
+</LoadingScreen>
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+
+    SemesterDto semester = new SemesterDto();
+
+    public bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SemesterService.GetSemesterById(id);
+
+        semester.Id = SemesterService.Semester.Id;
+        semester.Name = SemesterService.Semester.Name;
+        semester.IsActive = SemesterService.Semester.IsActive;
+        semester.IsVisibleInstructor = SemesterService.Semester.IsVisibleInstructor;
+        semester.IsVisibleStudent = SemesterService.Semester.IsVisibleStudent;
+        semester.StartDate = SemesterService.Semester.StartDate;
+        semester.EndDate = SemesterService.Semester.EndDate;
+        isLoading = false;
+    }
+
+    async Task HandleSubmit()
+    {
+        await SemesterService.EditSemester(semester);
+        if (SemesterService.ErrorMessage is null)
+        {
+            ShowToast(Messages.SuccessEdit, "Félév Hozzáadva", ToastType.Success);
+            NavigateBack();
+        }
+        else
+        {
+            ShowToast(Messages.FailedEdit, SemesterService.ErrorMessage ?? "Félév hozzáadása sikertelen", ToastType.Warning);
+        }
+    }
+    
+    private void onChange(RangePickerEventArgs<DateTime> args)
+    {
+        semester.StartDate = args.StartDate;
+        semester.EndDate = args.EndDate;
+        StateHasChanged();
+    }
+}
